@@ -21,6 +21,7 @@ using UnityEngine;
 /// 4. 禁止外部修改世界缩放：无任何 SetWorldScale / lossyScale setter。
 /// 5. SetParent(keepWorld=true) 时通过矩阵反求 local（精确，不估算）
 /// </summary>
+[BurstCompile(OptimizeFor = OptimizeFor.Performance)]
 public class Transform2DFixed
 {
     #region 字段
@@ -452,17 +453,34 @@ public class Transform2DFixed
 
     private static FP NormalizeRad(FP a)
     {
+        /*
         a %= (FP.PiTimes2);
         if (a <= -FP.Pi) a += FP.PiTimes2;
         if (a >  FP.Pi)  a -= FP.PiTimes2;
+        */
+        NormalizeRad(ref a);
         return a;
+    }
+    [BurstCompile,MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void NormalizeRad(ref FP a)
+    {
+        a %= (FP.PiTimes2);
+        if (a <= 0-FP.Pi) a += FP.PiTimes2;
+        if (a >  FP.Pi)  a -= FP.PiTimes2;
     }
 
     private static TSVector2 SanitizeScale(TSVector2 s)
     {
-        if (FP.Abs(s.x) < MIN_ABS_SCALE) s.x = (s.x >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
-        if (FP.Abs(s.y) < MIN_ABS_SCALE) s.y = (s.y >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        //if (FP.Abs(s.x) < MIN_ABS_SCALE) s.x = (s.x >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        //if (FP.Abs(s.y) < MIN_ABS_SCALE) s.y = (s.y >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        SanitizeScale(ref s);
         return s;
+    }
+    [BurstCompile,MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SanitizeScale(ref TSVector2 s)
+    {
+        if (FP.Abs(s.x) < MIN_ABS_SCALE) s.x = (s.x >= 0 ? MIN_ABS_SCALE : 0-MIN_ABS_SCALE);
+        if (FP.Abs(s.y) < MIN_ABS_SCALE) s.y = (s.y >= 0 ? MIN_ABS_SCALE : 0-MIN_ABS_SCALE);
     }
 
     private static int SignNonZero(FP v) => v < 0 ? -1 : 1;
