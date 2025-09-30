@@ -1,9 +1,10 @@
-#if false
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Core.TrueSync;
 using Unity.Burst;
+using Unity.Mathematics;
 using UnityEngine;
 
 /// <summary>
@@ -27,54 +28,54 @@ public class Transform2DFixed
     private readonly HashSet<Transform2DFixed> _children = new();
 
     // Local
-    private Vector2 _localPosition = Vector2.zero;
-    private float   _localRotation = 0f;          // radians
-    private Vector2 _localScale    = Vector2.one; // 可为负
+    private TSVector2 _localPosition = TSVector2.zero;
+    private FP   _localRotation = 0f;          // radians
+    private TSVector2 _localScale    = TSVector2.one; // 可为负
 
     // Cached matrices
     private TMatrix2x3 _localMatrix = TMatrix2x3.Identity;
     private TMatrix2x3 _worldMatrix = TMatrix2x3.Identity;
 
     // World (cached)
-    private Vector2 _worldPosition = Vector2.zero;
-    private float   _worldRotation = 0f;          // radians (with reflection rule)
-    private Vector2 _worldScale    = Vector2.one; // 公式法得到的 lossyScale (read-only)
+    private TSVector2 _worldPosition = TSVector2.zero;
+    private FP   _worldRotation = 0f;          // radians (with reflection rule)
+    private TSVector2 _worldScale    = TSVector2.one; // 公式法得到的 lossyScale (read-only)
 
     // 纯旋转累积矩阵 R_world (2x2)
-    private float _rw00 = 1f, _rw01 = 0f, _rw10 = 0f, _rw11 = 1f;
+    private FP _rw00 = 1f, _rw01 = 0f, _rw10 = 0f, _rw11 = 1f;
 
     // Abs 线性累积 W_world_abs (2x2) = Π (R_i * |S_i|)
-    private float _aw00 = 1f, _aw01 = 0f, _aw10 = 0f, _aw11 = 1f;
+    private FP _aw00 = 1f, _aw01 = 0f, _aw10 = 0f, _aw11 = 1f;
 
     // 符号链
-    private Vector2 _signAccum = new Vector2(1, 1);
+    private int2 _signAccum = new int2(1, 1);
 
     private bool _localDirty = true;
     private bool _worldDirty = true;
 
-    private const float MIN_ABS_SCALE = 1e-6f;
+    private static readonly FP MIN_ABS_SCALE = FP.EN6;
     #endregion
 
     #region Local 属性
-    public Vector2 localPosition
+    public TSVector2 localPosition
     {
         get => _localPosition;
         set { if (_localPosition != value) { _localPosition = value; MarkLocalDirty(); } }
     }
 
-    public float localRotationDegrees
+    public FP localRotationDegrees
     {
-        get => _localRotation * Mathf.Rad2Deg;
-        set => LocalRotationRad = value * Mathf.Deg2Rad;
+        get => _localRotation * FP.Rad2Deg;
+        set => LocalRotationRad = value * FP.Deg2Rad;
     }
 
-    public float LocalRotationRad
+    public FP LocalRotationRad
     {
         get => _localRotation;
         set
         {
             value = NormalizeRad(value);
-            if (!Mathf.Approximately(_localRotation, value))
+            if (_localRotation!=value)
             {
                 _localRotation = value;
                 MarkLocalDirty();
@@ -82,7 +83,7 @@ public class Transform2DFixed
         }
     }
 
-    public Vector2 localScale
+    public TSVector2 localScale
     {
         get => _localScale;
         set
@@ -98,16 +99,16 @@ public class Transform2DFixed
     #endregion
 
     #region World 只读属性
-    public Vector2 worldPosition    { get { UpdateWorld(); return _worldPosition; } }
-    public float   worldRotationDeg { get { UpdateWorld(); return _worldRotation * Mathf.Rad2Deg; } }
-    public float   WorldRotationRad { get { UpdateWorld(); return _worldRotation; } }
-    public Vector2 worldScale       { get { UpdateWorld(); return _worldScale; } } // (公式法 lossyScale)
-    public Vector2 lossyScale       => worldScale;
-    public Vector2 signAccum        { get { UpdateWorld(); return _signAccum; } }
+    public TSVector2 worldPosition    { get { UpdateWorld(); return _worldPosition; } }
+    public FP   worldRotationDeg { get { UpdateWorld(); return _worldRotation * FP.Rad2Deg; } }
+    public FP   WorldRotationRad { get { UpdateWorld(); return _worldRotation; } }
+    public TSVector2 worldScale       { get { UpdateWorld(); return _worldScale; } } // (公式法 lossyScale)
+    public TSVector2 lossyScale       => worldScale;
+    public int2 signAccum        { get { UpdateWorld(); return _signAccum; } }
 
     // Unity-like 只允许 position/rotation 改
-    public Vector2 position   { get => worldPosition;   set => SetWorldPosition(value); }
-    public float   rotationDeg{ get => worldRotationDeg; set => SetWorldRotationDegrees(value); }
+    public TSVector2 position   { get => worldPosition;   set => SetWorldPosition(value); }
+    public FP   rotationDeg{ get => worldRotationDeg; set => SetWorldRotationDegrees(value); }
 
     public TMatrix2x3 worldMatrix { get { UpdateWorld(); return _worldMatrix; } }
     public TMatrix2x3 localMatrix { get { UpdateLocal(); return _localMatrix; } }
@@ -171,11 +172,11 @@ public class Transform2DFixed
     {
         if (!_localDirty) return;
 
-        float r = _localRotation;
-        float cosR = Mathf.Cos(r);
-        float sinR = Mathf.Sin(r);
-        float sx = _localScale.x;
-        float sy = _localScale.y;
+        FP r = _localRotation;
+        FP cosR = FP.FastCos(r);
+        FP sinR = FP.FastSin(r);
+        FP sx = _localScale.x;
+        FP sy = _localScale.y;
 
         // localMatrix = R * S
         _localMatrix.m00 = cosR * sx;
@@ -196,25 +197,25 @@ public class Transform2DFixed
         if (_parent == null)
         {
             _worldMatrix = _localMatrix;
-            _worldPosition = new Vector2(_localMatrix.m02, _localMatrix.m12);
+            _worldPosition = new TSVector2(_localMatrix.m02, _localMatrix.m12);
 
             // 纯旋转 R_world = R_local
-            float r = _localRotation;
-            float cosR = Mathf.Cos(r);
-            float sinR = Mathf.Sin(r);
+            FP r = _localRotation;
+            FP cosR = FP.FastCos(r);
+            FP sinR = FP.FastSin(r);
             _rw00 = cosR; _rw01 = -sinR;
             _rw10 = sinR; _rw11 =  cosR;
 
             // W_world_abs = R_local * |S_local|
-            float ax = Mathf.Abs(_localScale.x);
-            float ay = Mathf.Abs(_localScale.y);
+            FP ax = FP.Abs(_localScale.x);
+            FP ay = FP.Abs(_localScale.y);
             _aw00 = cosR * ax;
             _aw10 = sinR * ax;
             _aw01 = -sinR * ay;
             _aw11 =  cosR * ay;
 
             // 符号链
-            _signAccum = new Vector2(SignNonZero(_localScale.x), SignNonZero(_localScale.y));
+            _signAccum = new int2(SignNonZero(_localScale.x), SignNonZero(_localScale.y));
 
             // worldRotation（根节点，无反射干扰）
             _worldRotation = _localRotation;
@@ -222,9 +223,9 @@ public class Transform2DFixed
             // 公式法 lossyScale:
             // S_world_abs = R_world^T * W_world_abs
             // diag = (rw00*aw00 + rw10*aw10, rw01*aw01 + rw11*aw11)
-            float s00 = _rw00 * _aw00 + _rw10 * _aw10;
-            float s11 = _rw01 * _aw01 + _rw11 * _aw11;
-            _worldScale = new Vector2(_signAccum.x * s00, _signAccum.y * s11);
+            FP s00 = _rw00 * _aw00 + _rw10 * _aw10;
+            FP s11 = _rw01 * _aw01 + _rw11 * _aw11;
+            _worldScale = new TSVector2(_signAccum.x * s00, _signAccum.y * s11);
         }
         else
         {
@@ -232,18 +233,18 @@ public class Transform2DFixed
 
             // 世界矩阵
             _worldMatrix = _parent._worldMatrix * _localMatrix;
-            _worldPosition = new Vector2(_worldMatrix.m02, _worldMatrix.m12);
+            _worldPosition = new TSVector2(_worldMatrix.m02, _worldMatrix.m12);
 
             // 局部旋转纯矩阵
-            float r = _localRotation;
-            float cosR = Mathf.Cos(r);
-            float sinR = Mathf.Sin(r);
+            FP r = _localRotation;
+            FP cosR = FP.FastCos(r);
+            FP sinR = FP.FastSin(r);
 
             // 父纯旋转矩阵
-            float pr00 = _parent._rw00;
-            float pr01 = _parent._rw01;
-            float pr10 = _parent._rw10;
-            float pr11 = _parent._rw11;
+            FP pr00 = _parent._rw00;
+            FP pr01 = _parent._rw01;
+            FP pr10 = _parent._rw10;
+            FP pr11 = _parent._rw11;
 
             // R_world = R_parent * R_local
             _rw00 = pr00 * cosR + pr01 * sinR;
@@ -252,26 +253,26 @@ public class Transform2DFixed
             _rw11 = pr10 * (-sinR) + pr11 * cosR;
 
             // W_world_abs = W_parent_abs * (R_local * |S_local|)
-            float ax = Mathf.Abs(_localScale.x);
-            float ay = Mathf.Abs(_localScale.y);
-            float rl00 = cosR * ax;
-            float rl10 = sinR * ax;
-            float rl01 = -sinR * ay;
-            float rl11 =  cosR * ay;
+            FP ax = FP.Abs(_localScale.x);
+            FP ay = FP.Abs(_localScale.y);
+            FP rl00 = cosR * ax;
+            FP rl10 = sinR * ax;
+            FP rl01 = -sinR * ay;
+            FP rl11 =  cosR * ay;
 
-            float paw00 = _parent._aw00;
-            float paw01 = _parent._aw01;
-            float paw10 = _parent._aw10;
-            float paw11 = _parent._aw11;
+            FP paw00 = _parent._aw00;
+            FP paw01 = _parent._aw01;
+            FP paw10 = _parent._aw10;
+            FP paw11 = _parent._aw11;
 
-            float newAw00 = paw00 * rl00 + paw01 * rl10;
-            float newAw01 = paw00 * rl01 + paw01 * rl11;
-            float newAw10 = paw10 * rl00 + paw11 * rl10;
-            float newAw11 = paw10 * rl01 + paw11 * rl11;
+            FP newAw00 = paw00 * rl00 + paw01 * rl10;
+            FP newAw01 = paw00 * rl01 + paw01 * rl11;
+            FP newAw10 = paw10 * rl00 + paw11 * rl10;
+            FP newAw11 = paw10 * rl01 + paw11 * rl11;
             _aw00 = newAw00; _aw01 = newAw01; _aw10 = newAw10; _aw11 = newAw11;
 
             // 符号链
-            _signAccum = new Vector2(
+            _signAccum = new int2(
                 _parent._signAccum.x * SignNonZero(_localScale.x),
                 _parent._signAccum.y * SignNonZero(_localScale.y)
             );
@@ -285,9 +286,9 @@ public class Transform2DFixed
             // 公式法 lossyScale:
             // S_world_abs = R_world^T * W_world_abs
             // R_world^T = [ rw00 rw10; rw01 rw11 ]
-            float s00 = _rw00 * _aw00 + _rw10 * _aw10;
-            float s11 = _rw01 * _aw01 + _rw11 * _aw11;
-            _worldScale = new Vector2(_signAccum.x * s00, _signAccum.y * s11);
+            FP s00 = _rw00 * _aw00 + _rw10 * _aw10;
+            FP s11 = _rw01 * _aw01 + _rw11 * _aw11;
+            _worldScale = new TSVector2(_signAccum.x * s00, _signAccum.y * s11);
         }
 
         _worldDirty = false;
@@ -295,7 +296,7 @@ public class Transform2DFixed
     #endregion
 
     #region 世界操作（仅位置/旋转）
-    public void SetWorldPosition(Vector2 wpos)
+    public void SetWorldPosition(TSVector2 wpos)
     {
         if (_parent == null)
             localPosition = wpos;
@@ -306,8 +307,8 @@ public class Transform2DFixed
         }
     }
 
-    public void SetWorldRotationDegrees(float deg) => SetWorldRotationRad(deg * Mathf.Deg2Rad);
-    public void SetWorldRotationRad(float desiredWorldRot)
+    public void SetWorldRotationDegrees(FP deg) => SetWorldRotationRad(deg * FP.Deg2Rad);
+    public void SetWorldRotationRad(FP desiredWorldRot)
     {
         if (_parent == null)
         {
@@ -317,7 +318,7 @@ public class Transform2DFixed
         {
             _parent.UpdateWorld();
             bool parentReflected = (_parent._signAccum.x * _parent._signAccum.y) < 0f;
-            float lr = parentReflected
+            FP lr = parentReflected
                 ? NormalizeRad(_parent.WorldRotationRad - desiredWorldRot)
                 : NormalizeRad(desiredWorldRot - _parent.WorldRotationRad);
             LocalRotationRad = lr;
@@ -326,16 +327,16 @@ public class Transform2DFixed
     #endregion
 
     #region Local 批量设置
-    public void SetLocalTRSDegrees(Vector2 pos, float rotDeg, Vector2 scale)
-        => SetLocalTRSRad(pos, rotDeg * Mathf.Deg2Rad, scale);
+    public void SetLocalTRSDegrees(TSVector2 pos, FP rotDeg, TSVector2 scale)
+        => SetLocalTRSRad(pos, rotDeg * FP.Deg2Rad, scale);
 
-    public void SetLocalTRSRad(Vector2 pos, float rotRad, Vector2 scale)
+    public void SetLocalTRSRad(TSVector2 pos, FP rotRad, TSVector2 scale)
     {
         bool changed = false;
         if (_localPosition != pos) { _localPosition = pos; changed = true; }
 
         rotRad = NormalizeRad(rotRad);
-        if (!Mathf.Approximately(_localRotation, rotRad)) { _localRotation = rotRad; changed = true; }
+        if (_localRotation!=rotRad) { _localRotation = rotRad; changed = true; }
 
         var sc = SanitizeScale(scale);
         if (_localScale != sc) { _localScale = sc; changed = true; }
@@ -349,26 +350,26 @@ public class Transform2DFixed
     #endregion
 
     #region 获取 world TRS
-    public (Vector2 position, float rotationRad, Vector2 scale) GetWorldTRSRad()
+    public (TSVector2 position, FP rotationRad, TSVector2 scale) GetWorldTRSRad()
     {
         UpdateWorld();
         return (_worldPosition, _worldRotation, _worldScale);
     }
 
-    public (Vector2 position, float rotationDeg, Vector2 scale) GetWorldTRSDegrees()
+    public (TSVector2 position, FP rotationDeg, TSVector2 scale) GetWorldTRSDegrees()
     {
         var w = GetWorldTRSRad();
-        return (w.position, w.rotationRad * Mathf.Rad2Deg, w.scale);
+        return (w.position, w.rotationRad * FP.Rad2Deg, w.scale);
     }
     #endregion
 
     #region 变换函数
-    public Vector2 TransformPoint(Vector2 p)             { UpdateWorld(); return _worldMatrix.MultiplyPoint(p); }
-    public Vector2 InverseTransformPoint(Vector2 p)      { UpdateWorld(); return _worldMatrix.Inverse().MultiplyPoint(p); }
-    public Vector2 TransformDirection(Vector2 d)         { UpdateWorld(); return _worldMatrix.MultiplyVector(d); }
-    public Vector2 InverseTransformDirection(Vector2 d)  { UpdateWorld(); return _worldMatrix.Inverse().MultiplyVector(d); }
+    public TSVector2 TransformPoint(TSVector2 p)             { UpdateWorld(); return _worldMatrix.MultiplyPoint(p); }
+    public TSVector2 InverseTransformPoint(TSVector2 p)      { UpdateWorld(); return _worldMatrix.Inverse().MultiplyPoint(p); }
+    public TSVector2 TransformDirection(TSVector2 d)         { UpdateWorld(); return _worldMatrix.MultiplyVector(d); }
+    public TSVector2 InverseTransformDirection(TSVector2 d)  { UpdateWorld(); return _worldMatrix.Inverse().MultiplyVector(d); }
 
-    public void Translate(Vector2 delta, Space space = Space.Self)
+    public void Translate(TSVector2 delta, Space space = Space.Self)
     {
         if (space == Space.Self)
         {
@@ -376,11 +377,11 @@ public class Transform2DFixed
             // 修复：当存在负 scale（反射）时，之前通过 worldMatrix 列向量得到的方向会被符号翻转，
             // 导致自空间平移方向与期望（与 worldRotation 视觉一致）不符。
             // 这里改为使用“世界旋转角”构造纯旋转基向量，从而忽略缩放与反射符号。
-            float r = _worldRotation;
-            float cosR = Mathf.Cos(r);
-            float sinR = Mathf.Sin(r);
-            Vector2 right = new Vector2(cosR, sinR);        // 纯旋转后的 x 轴
-            Vector2 up    = new Vector2(-sinR, cosR);       // 纯旋转后的 y 轴 (左手系: R*[0,1])
+            FP r = _worldRotation;
+            FP cosR = FP.FastCos(r);
+            FP sinR = FP.FastSin(r);
+            TSVector2 right = new TSVector2(cosR, sinR);        // 纯旋转后的 x 轴
+            TSVector2 up    = new TSVector2(-sinR, cosR);       // 纯旋转后的 y 轴 (左手系: R*[0,1])
             SetWorldPosition(_worldPosition + right * delta.x + up * delta.y);
         }
         else
@@ -389,7 +390,7 @@ public class Transform2DFixed
         }
     }
 
-    public void Rotate(float deltaDegrees, Space space = Space.Self)
+    public void Rotate(FP deltaDegrees, Space space = Space.Self)
     {
         if (space == Space.Self)
             localRotationDegrees = localRotationDegrees + deltaDegrees;
@@ -397,20 +398,20 @@ public class Transform2DFixed
             rotationDeg = rotationDeg + deltaDegrees;
     }
 
-    public void LookAt(Vector2 worldPoint)
+    public void LookAt(TSVector2 worldPoint)
     {
-        Vector2 dir = worldPoint - worldPosition;
-        if (dir.sqrMagnitude < 1e-12f) return;
-        float ang = Mathf.Atan2(dir.y, dir.x);
+        TSVector2 dir = worldPoint - worldPosition;
+        if (dir.LengthSquared() < FP.EN7) return;
+        FP ang = FP.Atan2(dir.y, dir.x);
         SetWorldRotationRad(ang);
     }
 
-    public float GetAngleTo(Vector2 worldPoint)
+    public FP GetAngleTo(TSVector2 worldPoint)
     {
-        Vector2 dir = worldPoint - worldPosition;
-        if (dir.sqrMagnitude < 1e-12f) return 0f;
-        float ang = Mathf.Atan2(dir.y, dir.x);
-        return Mathf.DeltaAngle(worldRotationDeg, ang * Mathf.Rad2Deg);
+        TSVector2 dir = worldPoint - worldPosition;
+        if (dir.LengthSquared() < FP.EN7) return FP.Zero;
+        FP ang = FP.Atan2(dir.y, dir.x);
+        return TSMath.DeltaAngle(worldRotationDeg, ang * FP.Rad2Deg);
     }
     #endregion
 
@@ -424,54 +425,54 @@ public class Transform2DFixed
     #endregion
 
     #region 分解 & 工具
-    private static void DecomposePureRS(TMatrix2x3 m, out Vector2 pos, out float rot, out Vector2 scale)
+    private static void DecomposePureRS(TMatrix2x3 m, out TSVector2 pos, out FP rot, out TSVector2 scale)
     {
-        pos = new Vector2(m.m02, m.m12);
+        pos = new TSVector2(m.m02, m.m12);
 
         // 线性部分 A = [a b; c d] = R * S (S 对角)
-        float a = m.m00; float b = m.m01;
-        float c = m.m10; float d = m.m11;
+        FP a = m.m00; FP b = m.m01;
+        FP c = m.m10; FP d = m.m11;
 
-        rot = Mathf.Atan2(c, a); // R 的角度
-        float cosR = Mathf.Cos(rot);
-        float sinR = Mathf.Sin(rot);
+        rot = FP.Atan2(c, a); // R 的角度
+        FP cosR = FP.FastCos(rot);
+        FP sinR = FP.FastSin(rot);
 
         // S = R^T * A
-        float s00 =  cosR * a + sinR * c;
-        float s11 = -sinR * b + cosR * d;
+        FP s00 =  cosR * a + sinR * c;
+        FP s11 = -sinR * b + cosR * d;
 
         // 防止极小
-        if (Mathf.Abs(s00) < MIN_ABS_SCALE) s00 = (s00 >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
-        if (Mathf.Abs(s11) < MIN_ABS_SCALE) s11 = (s11 >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        if (FP.Abs(s00) < MIN_ABS_SCALE) s00 = (s00 >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        if (FP.Abs(s11) < MIN_ABS_SCALE) s11 = (s11 >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
 
-        scale = new Vector2(s00, s11);
+        scale = new TSVector2(s00, s11);
 
         rot = NormalizeRad(rot);
     }
 
-    private static float NormalizeRad(float a)
+    private static FP NormalizeRad(FP a)
     {
-        a %= (2 * Mathf.PI);
-        if (a <= -Mathf.PI) a += 2 * Mathf.PI;
-        if (a >  Mathf.PI)  a -= 2 * Mathf.PI;
+        a %= (FP.PiTimes2);
+        if (a <= -FP.Pi) a += FP.PiTimes2;
+        if (a >  FP.Pi)  a -= FP.PiTimes2;
         return a;
     }
 
-    private static Vector2 SanitizeScale(Vector2 s)
+    private static TSVector2 SanitizeScale(TSVector2 s)
     {
-        if (Mathf.Abs(s.x) < MIN_ABS_SCALE) s.x = (s.x >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
-        if (Mathf.Abs(s.y) < MIN_ABS_SCALE) s.y = (s.y >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        if (FP.Abs(s.x) < MIN_ABS_SCALE) s.x = (s.x >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        if (FP.Abs(s.y) < MIN_ABS_SCALE) s.y = (s.y >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
         return s;
     }
 
-    private static float SignNonZero(float v) => v < 0 ? -1f : 1f;
+    private static int SignNonZero(FP v) => v < 0 ? -1 : 1;
     #endregion
 
     #region 调试
     public override string ToString()
     {
         var w = GetWorldTRSRad();
-        return $"Local(pos={_localPosition}, rot={localRotationDegrees:F2}°, scale={_localScale}) | World(pos={w.position}, rot={w.rotationRad * Mathf.Rad2Deg:F2}°, formulaLossyScale={w.scale}, signAccum={_signAccum})";
+        return $"Local(pos={_localPosition}, rot={localRotationDegrees:F2}°, scale={_localScale}) | World(pos={w.position}, rot={w.rotationRad * FP.Rad2Deg:F2}°, formulaLossyScale={w.scale}, signAccum={_signAccum})";
     }
 
     public Matrix4x4 WorldMatrix4x4
@@ -480,10 +481,10 @@ public class Transform2DFixed
         {
             var m = worldMatrix;
             return new Matrix4x4(
-                new Vector4(m.m00, m.m10, 0, 0),
-                new Vector4(m.m01, m.m11, 0, 0),
+                new Vector4((float)m.m00, (float)m.m10, 0, 0),
+                new Vector4((float)m.m01, (float)m.m11, 0, 0),
                 new Vector4(0,      0,     1, 0),
-                new Vector4(m.m02, m.m12,  0, 1)
+                new Vector4((float)m.m02, (float)m.m12,  0, 1)
             );
         }
     }
@@ -494,10 +495,10 @@ public class Transform2DFixed
         {
             var m = localMatrix;
             return new Matrix4x4(
-                new Vector4(m.m00, m.m10, 0, 0),
-                new Vector4(m.m01, m.m11, 0, 0),
+                new Vector4((float)m.m00, (float)m.m10, 0, 0),
+                new Vector4((float)m.m01, (float)m.m11, 0, 0),
                 new Vector4(0,      0,     1, 0),
-                new Vector4(m.m02, m.m12,  0, 1)
+                new Vector4((float)m.m02, (float)m.m12,  0, 1)
             );
         }
     }
@@ -511,4 +512,3 @@ public class Transform2DFixed
     }
     #endregion
 }
-#endif

@@ -100,5 +100,10 @@ using Unity.Burst;
             r.x = m.m00 * v.x + m.m01 * v.y;
             r.y = m.m10 * v.x + m.m11 * v.y;
         }
+
+        public override string ToString()
+        {
+            return $"[\n  {m00}, {m01}, {m02},\n  {m10}, {m11}, {m12}\n]";
+        }
     }
     #endregion

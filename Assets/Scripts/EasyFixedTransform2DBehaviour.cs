@@ -1,39 +1,40 @@
 using System;
+using Core.TrueSync;
 using UnityEngine;
 
 [DisallowMultipleComponent]
-public class EasyTransform2DBehaviour : MonoBehaviour
+public class EasyFixedTransform2DBehaviour : MonoBehaviour
 {
     public enum SyncMode { WriteToUnity } // 保留枚举占位（只支持写）
 
     [Header("Initialization (Play Mode Only)")]
     public bool setLocalPosition;
-    public Vector2 initialLocalPosition;
+    public TSVector2 initialLocalPosition;
     public bool errorIfUnsetLocalPosition;
 
     public bool setLocalRotation;
-    public float initialLocalRotationDegrees;
+    public FP initialLocalRotationDegrees;
     public bool errorIfUnsetLocalRotation;
 
     public bool setLocalScale;
-    public Vector2 initialLocalScale = Vector2.one;
+    public TSVector2 initialLocalScale = TSVector2.one;
     public bool errorIfUnsetLocalScale;
 
     [Header("Options")]
     public bool applyScaleZAsOne = true;
 
-    [SerializeField] private CachedTransform2DNode _node = new CachedTransform2DNode();
-    public CachedTransform2DNode Node => _node;
+    [SerializeField] private Transform2DFixed _node = new Transform2DFixed();
+    public Transform2DFixed Node => _node;
 
-    public EasyTransform2DBehaviour Parent { get; private set; }
+    public EasyFixedTransform2DBehaviour Parent { get; private set; }
 
     private bool _dirtyLocal;
     private bool _writeAppliedThisFrame;
 
-    private const float kRotEps = 0.0001f;
+    private static readonly FP kRotEps = FP.EN4;
 
     #region 本地属性
-    public Vector2 localPosition
+    public TSVector2 localPosition
     {
         get => _node.localPosition;
         set
@@ -46,12 +47,12 @@ public class EasyTransform2DBehaviour : MonoBehaviour
         }
     }
 
-    public float localRotationDegrees
+    public FP localRotationDegrees
     {
         get => _node.localRotationDegrees;
         set
         {
-            if (Mathf.Abs(Mathf.DeltaAngle(_node.localRotationDegrees, value)) > kRotEps)
+            if (FP.Abs(TSMath.DeltaAngle(_node.localRotationDegrees, value)) > kRotEps)
             {
                 _node.localRotationDegrees = value;
                 MarkLocalDirty();
@@ -59,7 +60,7 @@ public class EasyTransform2DBehaviour : MonoBehaviour
         }
     }
 
-    public Vector2 localScale
+    public TSVector2 localScale
     {
         get => _node.localScale;
         set
@@ -74,12 +75,12 @@ public class EasyTransform2DBehaviour : MonoBehaviour
     #endregion
 
     #region 世界便捷属性
-    public Vector2 worldPosition => _node.worldPosition;
-    public float worldRotationDegrees => _node.rotationDeg;
-    public Vector2 worldScale => _node.worldScale;
-    public Vector2 lossyScale => _node.worldScale;
+    public TSVector2 worldPosition => _node.worldPosition;
+    public FP worldRotationDegrees => _node.rotationDeg;
+    public TSVector2 worldScale => _node.worldScale;
+    public TSVector2 lossyScale => _node.worldScale;
 
-    public Vector2 position
+    public TSVector2 position
     {
         get => _node.position;
         set
@@ -92,12 +93,12 @@ public class EasyTransform2DBehaviour : MonoBehaviour
         }
     }
 
-    public float rotationDegrees
+    public FP rotationDegrees
     {
         get => _node.rotationDeg;
         set
         {
-            if (Mathf.Abs(Mathf.DeltaAngle(_node.rotationDeg, value)) > kRotEps)
+            if (FP.Abs(TSMath.DeltaAngle(_node.rotationDeg, value)) > kRotEps)
             {
                 _node.rotationDeg = value;
                 MarkLocalDirty();
@@ -123,9 +124,9 @@ public class EasyTransform2DBehaviour : MonoBehaviour
         else
         {
             if (errorIfUnsetLocalPosition)
-                Debug.LogError($"[EasyTransform2DBehaviour] 未设置 localPosition 且被标记为必填: {name}", this);
+                Debug.LogError($"[EasyFixedTransform2DBehaviour] 未设置 localPosition 且被标记为必填: {name}", this);
             var lp = transform.localPosition;
-            _node.localPosition = new Vector2(lp.x, lp.y);
+            _node.localPosition = new TSVector2(lp.x, lp.y);
         }
 
         // 初始化本地 Rotation
@@ -134,7 +135,7 @@ public class EasyTransform2DBehaviour : MonoBehaviour
         else
         {
             if (errorIfUnsetLocalRotation)
-                Debug.LogError($"[EasyTransform2DBehaviour] 未设置 localRotation 且被标记为必填: {name}", this);
+                Debug.LogError($"[EasyFixedTransform2DBehaviour] 未设置 localRotation 且被标记为必填: {name}", this);
             _node.localRotationDegrees = transform.localRotation.eulerAngles.z;
         }
 
@@ -144,9 +145,9 @@ public class EasyTransform2DBehaviour : MonoBehaviour
         else
         {
             if (errorIfUnsetLocalScale)
-                Debug.LogError($"[EasyTransform2DBehaviour] 未设置 localScale 且被标记为必填: {name}", this);
+                Debug.LogError($"[EasyFixedTransform2DBehaviour] 未设置 localScale 且被标记为必填: {name}", this);
             var ls = transform.localScale;
-            _node.localScale = new Vector2(ls.x, ls.y);
+            _node.localScale = new TSVector2(ls.x, ls.y);
         }
 
         MarkLocalDirty();
@@ -182,21 +183,21 @@ public class EasyTransform2DBehaviour : MonoBehaviour
     {
         // Position（保持原 z）
         Vector3 cur = transform.localPosition;
-        transform.localPosition = new Vector3(_node.localPosition.x, _node.localPosition.y, cur.z);
+        transform.localPosition = new Vector3((float)_node.localPosition.x, (float)_node.localPosition.y, cur.z);
 
         // Rotation
-        float curRot = transform.localRotation.eulerAngles.z;
-        if (Mathf.Abs(Mathf.DeltaAngle(curRot, _node.localRotationDegrees)) > kRotEps)
-            transform.localRotation = Quaternion.Euler(0, 0, _node.localRotationDegrees);
+        FP curRot = transform.localRotation.eulerAngles.z;
+        if (FP.Abs(TSMath.DeltaAngle(curRot, _node.localRotationDegrees)) > kRotEps)
+            transform.localRotation = Quaternion.Euler(0, 0, (float)_node.localRotationDegrees);
 
         // Scale
         float z = applyScaleZAsOne ? 1f : transform.localScale.z;
-        transform.localScale = new Vector3(_node.localScale.x, _node.localScale.y, z);
+        transform.localScale = new Vector3((float)_node.localScale.x, (float)_node.localScale.y, z);
     }
     #endregion
 
     #region 层级
-    public void SetParent(EasyTransform2DBehaviour newParent, bool keepWorldPosition = true)
+    public void SetParent(EasyFixedTransform2DBehaviour newParent, bool keepWorldPosition = true)
     {
         if (!Application.isPlaying) return;
         if (Parent == newParent) return;
@@ -219,7 +220,7 @@ public class EasyTransform2DBehaviour : MonoBehaviour
     {
         // 运行期如果用户手动改了 Unity 层级，需要同步 _node 父级
         if (!Application.isPlaying) return;
-        var p = transform.parent ? transform.parent.GetComponent<EasyTransform2DBehaviour>() : null;
+        var p = transform.parent ? transform.parent.GetComponent<EasyFixedTransform2DBehaviour>() : null;
         if (p != Parent)
         {
             Parent = p;
@@ -246,14 +247,14 @@ public class EasyTransform2DBehaviour : MonoBehaviour
         if (!Application.isPlaying) return;
 
         Vector3 lp = transform.localPosition;
-        float lr = transform.localRotation.eulerAngles.z;
+        FP lr = transform.localRotation.eulerAngles.z;
         Vector3 ls = transform.localScale;
 
         bool changed = false;
-        Vector2 lp2 = new Vector2(lp.x, lp.y);
+        TSVector2 lp2 = new TSVector2(lp.x, lp.y);
         if (_node.localPosition != lp2) { _node.localPosition = lp2; changed = true; }
-        if (Mathf.Abs(Mathf.DeltaAngle(_node.localRotationDegrees, lr)) > kRotEps) { _node.localRotationDegrees = lr; changed = true; }
-        Vector2 ls2 = new Vector2(ls.x, ls.y);
+        if (FP.Abs(TSMath.DeltaAngle(_node.localRotationDegrees, lr)) > kRotEps) { _node.localRotationDegrees = lr; changed = true; }
+        TSVector2 ls2 = new TSVector2(ls.x, ls.y);
         if (_node.localScale != ls2) { _node.localScale = ls2; changed = true; }
 
         if (changed) MarkLocalDirty();
@@ -273,22 +274,22 @@ public class EasyTransform2DBehaviour : MonoBehaviour
     #endregion
 
     #region TRS 批量
-    public void SetLocalTRSDegrees(Vector2 pos, float rotDeg, Vector2 scl)
+    public void SetLocalTRSDegrees(TSVector2 pos, FP rotDeg, TSVector2 scl)
     {
         bool changed = false;
         if (_node.localPosition != pos) { _node.localPosition = pos; changed = true; }
-        if (Mathf.Abs(Mathf.DeltaAngle(_node.localRotationDegrees, rotDeg)) > kRotEps) { _node.localRotationDegrees = rotDeg; changed = true; }
+        if (FP.Abs(TSMath.DeltaAngle(_node.localRotationDegrees, rotDeg)) > kRotEps) { _node.localRotationDegrees = rotDeg; changed = true; }
         if (_node.localScale != scl) { _node.localScale = scl; changed = true; }
         if (changed) MarkLocalDirty();
     }
 
-    public void SetLocalTRS(Vector2 pos, float rotRad, Vector2 scl) =>
+    public void SetLocalTRS(TSVector2 pos, FP rotRad, TSVector2 scl) =>
         SetLocalTRSDegrees(pos, rotRad * Mathf.Rad2Deg, scl);
     #endregion
 
     #region 点/矩阵工具
-    public Vector2 TransformPointLocalToWorld(Vector2 p) => _node.TransformPoint(p);
-    public Vector2 TransformPointWorldToLocal(Vector2 p) => _node.InverseTransformPoint(p);
+    public TSVector2 TransformPointLocalToWorld(TSVector2 p) => _node.TransformPoint(p);
+    public TSVector2 TransformPointWorldToLocal(TSVector2 p) => _node.InverseTransformPoint(p);
     public Matrix4x4 GetWorldMatrix4x4() => _node.WorldMatrix4x4;
     #endregion
 }
