@@ -236,7 +236,6 @@ public class CachedTransform2DNode
         if (!_worldDirty) return;
 
         UpdateLocal();
-
         if (_parent == null)
         {
             _worldMatrix = _localMatrix;

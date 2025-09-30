@@ -1,9 +1,12 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 public static class Transform2DBehaviourSettings
 {
-    // 关闭 = 即时风格(仍在 LateUpdate 合并一次)，开启 = 延迟写模式(仅脏时在 LateUpdate 批写)
+    // 编辑器(非运行)是否允许写入序列化缓存
+    public const bool EditorPersistEnabled = true;
+    // Play(运行期)是否写入序列化缓存（保持 Unity 行为建议 false）
+    public const bool PlayModePersistEnabled = false;
+    // 是否延迟到 LateUpdate 再写 Unity Transform
     public const bool DeferredWriteMode = false;
 }
 
@@ -22,7 +25,6 @@ public class Transform2DBehaviour : MonoBehaviour
 
     [SerializeField] private CachedTransform2DNode _node = new CachedTransform2DNode();
     public CachedTransform2DNode Node => _node;
-
     [SerializeField] private Vector2 _storedLocalPosition = Vector2.zero;
     [SerializeField] private float _storedLocalRotation = 0f;
     [SerializeField] private Vector2 _storedLocalScale = Vector2.one;
@@ -30,44 +32,29 @@ public class Transform2DBehaviour : MonoBehaviour
 
     public Transform2DBehaviour Parent { get; private set; }
 
-    private bool _dirtyLocal = false;
-    private bool _pendingPersist = false;
-    private bool _writeAppliedThisFrame = false;
+    private bool _dirtyLocal;
+    private bool _pendingPersist;
+    private bool _writeAppliedThisFrame;
     private static readonly float kRotEps = 0.0001f;
 
-    #region 本地属性
-    public Vector2 localPosition
-    {
-        get => _node.localPosition;
-        set { if (_node.localPosition != value) { _node.localPosition = value; MarkLocalDirty(); } }
-    }
-    public float localRotationDegrees
-    {
-        get => _node.localRotationDegrees;
-        set { if (!Mathf.Approximately(_node.localRotationDegrees, value)) { _node.localRotationDegrees = value; MarkLocalDirty(); } }
-    }
-    public Vector2 localScale
-    {
-        get => _node.localScale;
-        set { if (_node.localScale != value) { _node.localScale = value; MarkLocalDirty(); } }
-    }
-    public Vector2 position
-    {
-        get => _node.position;
-        set { if (_node.position != value) { _node.position = value; MarkLocalDirty(); } }
-    }
-    public float rotationDegrees
-    {
-        get => _node.rotationDeg;
-        set { if (Mathf.Abs(_node.rotationDeg - value) > kRotEps) { _node.rotationDeg = value; MarkLocalDirty(); } }
-    }
-    public Vector2 lossyScale => _node.worldScale;
-    #endregion
+#if UNITY_EDITOR
+    // 用于识别刚退出 Play 的那一帧
+    private static bool s_LastPlaying;
+    private static bool s_JustExitedPlay;
+#endif
 
-    #region 世界只读
+    #region 本地/世界属性
+    public Vector2 localPosition { get => _node.localPosition; set { if (_node.localPosition != value) { _node.localPosition = value; MarkLocalDirty(); } } }
+    public float localRotationDegrees { get => _node.localRotationDegrees; set { if (!Mathf.Approximately(_node.localRotationDegrees, value)) { _node.localRotationDegrees = value; MarkLocalDirty(); } } }
+    public Vector2 localScale { get => _node.localScale; set { if (_node.localScale != value) { _node.localScale = value; MarkLocalDirty(); } } }
+
     public Vector2 worldPosition => _node.worldPosition;
     public float worldRotationDegrees => _node.rotationDeg;
     public Vector2 worldScale => _node.worldScale;
+
+    public Vector2 position { get => _node.position; set { if (_node.position != value) { _node.position = value; MarkLocalDirty(); } } }
+    public float rotationDegrees { get => _node.rotationDeg; set { if (Mathf.Abs(_node.rotationDeg - value) > kRotEps) { _node.rotationDeg = value; MarkLocalDirty(); } } }
+    public Vector2 lossyScale => _node.worldScale;
     #endregion
 
     #region 批量设置
@@ -86,110 +73,78 @@ public class Transform2DBehaviour : MonoBehaviour
     #region 层级
     public void SetParent(Transform2DBehaviour newParent, bool keepWorldPosition = true)
     {
-        if (Parent == newParent && transform.parent == (newParent != null ? newParent.transform : null)) return;
+        if (Parent == newParent && transform.parent == (newParent ? newParent.transform : null)) return;
         Parent = newParent;
-        _node.SetParent(newParent != null ? newParent._node : null, keepWorldPosition);
-        if (syncMode == SyncMode.WriteToUnity)
+        _node.SetParent(newParent ? newParent._node : null, keepWorldPosition);
+        if (syncMode == SyncMode.WriteToUnity && autoAttachByUnityHierarchy)
         {
-            if (autoAttachByUnityHierarchy)
-            {
-                transform.parent = newParent != null ? newParent.transform : null;
-            }
-            MarkLocalDirty();
+            transform.parent = newParent ? newParent.transform : null;
         }
+        MarkLocalDirty();
     }
-    #endregion
-
-    #region 新增：统一采集 Unity 当前本地 TRS
-    private void CaptureUnityToStored()
-    {
-        Vector3 lp = transform.localPosition;
-        Vector3 ls = transform.localScale;
-        float lr = transform.localRotation.eulerAngles.z;
-        _storedLocalPosition = new Vector2(lp.x, lp.y);
-        _storedLocalRotation = lr;
-        _storedLocalScale = new Vector2(ls.x, ls.y);
-        _hasStored = true;
-    }
-    #endregion
-
-    #region 生命周期（修改 InitializeState）
-    private void OnEnable()
-    {
-        InitializeState();
-    }
-
     private void OnTransformParentChanged()
     {
-        if (autoAttachByUnityHierarchy)
+        if (!autoAttachByUnityHierarchy) return;
+        if (transform.parent)
         {
-            if (transform.parent != null)
-            {
-                var pb = transform.parent.GetComponent<Transform2DBehaviour>();
-                SetParent(pb, keepWorldPosition: true);
-            }
-            else SetParent(null, keepWorldPosition: true);
+            var p = transform.parent.GetComponent<Transform2DBehaviour>();
+            SetParent(p, true);
         }
+        else SetParent(null, true);
     }
+    #endregion
+
+    #region 初始化/生命周期
+    private void OnEnable() => InitializeState();
 
     private void InitializeState()
     {
-        // 进入运行或编辑启用时：决定采用哪一份数据作为“真源”
         bool playing = Application.isPlaying;
-
+#if UNITY_EDITOR
+        s_JustExitedPlay = !playing && s_LastPlaying;
+        s_LastPlaying = playing;
+#endif
         if (syncMode == SyncMode.WriteToUnity)
         {
-            // Write 模式下节点驱动 Unity Transform。
-            // 需要判断是否要采用当前 Unity 值而不是序列化缓存，避免“启动一瞬间被旧缓存（可能是原点）覆盖”。
 #if UNITY_EDITOR
             if (playing)
             {
-                if (!_hasStored || adoptUnityOnPlayInWriteMode)
-                    CaptureUnityToStored();
+                if (!_hasStored || adoptUnityOnPlayInWriteMode) CaptureUnityToStored();
             }
             else
             {
-                // 编辑器下：如果还没有缓存，或用户在场景里直接手动改了 Transform（与缓存不一致），就采纳 Unity
-                if (!_hasStored ||
-                    transform.localPosition.x != _storedLocalPosition.x ||
-                    transform.localPosition.y != _storedLocalPosition.y ||
-                    Mathf.Abs(Mathf.DeltaAngle(transform.localRotation.eulerAngles.z, _storedLocalRotation)) > kRotEps ||
-                    transform.localScale.x != _storedLocalScale.x ||
-                    transform.localScale.y != _storedLocalScale.y)
+                bool allowCapture = true;
+                if (s_JustExitedPlay && !adoptUnityOnPlayInWriteMode)
+                    allowCapture = false;
+
+                if (allowCapture)
                 {
-                    CaptureUnityToStored();
+                    if (!_hasStored ||
+                        transform.localPosition.x != _storedLocalPosition.x ||
+                        transform.localPosition.y != _storedLocalPosition.y ||
+                        Mathf.Abs(Mathf.DeltaAngle(transform.localRotation.eulerAngles.z, _storedLocalRotation)) > kRotEps ||
+                        transform.localScale.x != _storedLocalScale.x ||
+                        transform.localScale.y != _storedLocalScale.y)
+                        CaptureUnityToStored();
                 }
             }
 #else
-            if (!_hasStored || adoptUnityOnPlayInWriteMode)
-                CaptureUnityToStored();
+            if (!_hasStored || adoptUnityOnPlayInWriteMode) CaptureUnityToStored();
 #endif
-            // 用缓存回填节点
             RestoreNodeFromStored();
-            MarkLocalDirty(); // 触发一次写，统一化
+            MarkLocalDirty();
         }
-        else if (syncMode == SyncMode.ReadFromUnity)
+        else
         {
-            // 读模式：节点跟随 Unity Transform，因此直接从 Unity 采集
-            CaptureUnityToStored();
-            RestoreNodeFromStored(); // 与缓存保持一致
-            // 不需要写回
-        }
-        else // None
-        {
-            if (!_hasStored)
-            {
-                // 没缓存就采一次，保证 Node 有初值
-                CaptureUnityToStored();
-            }
+            if (!_hasStored) CaptureUnityToStored();
             RestoreNodeFromStored();
+            if (syncMode == SyncMode.ReadFromUnity) ReadFromUnityTransform();
         }
 
-        // 自动层级绑定（放在最后，保证 Node 已初始化）
-        if (autoAttachByUnityHierarchy && transform.parent != null)
+        if (autoAttachByUnityHierarchy && transform.parent)
         {
             var p = transform.parent.GetComponent<Transform2DBehaviour>();
-            if (p != null) SetParent(p, keepWorldPosition: true);
+            if (p) SetParent(p, true);
         }
     }
 
@@ -204,7 +159,26 @@ public class Transform2DBehaviour : MonoBehaviour
     }
     #endregion
 
-    #region 持久化/脏标记
+    #region 捕获/恢复
+    private void CaptureUnityToStored()
+    {
+        var lp = transform.localPosition;
+        var ls = transform.localScale;
+        float lr = transform.localRotation.eulerAngles.z;
+        _storedLocalPosition = new Vector2(lp.x, lp.y);
+        _storedLocalRotation = lr;
+        _storedLocalScale = new Vector2(ls.x, ls.y);
+        _hasStored = true;
+    }
+    private void RestoreNodeFromStored()
+    {
+        _node.localPosition = _storedLocalPosition;
+        _node.localRotationDegrees = _storedLocalRotation;
+        _node.localScale = _storedLocalScale;
+    }
+    #endregion
+
+    #region 脏标记/持久化
     private void MarkLocalDirty()
     {
         _dirtyLocal = true;
@@ -212,21 +186,41 @@ public class Transform2DBehaviour : MonoBehaviour
 #if UNITY_EDITOR
         if (!Application.isPlaying)
         {
-            if (syncMode == SyncMode.WriteToUnity) FlushIfDirty();
-            else if (syncMode == SyncMode.None) PersistIfNeeded();
+            if (syncMode == SyncMode.WriteToUnity && !Transform2DBehaviourSettings.DeferredWriteMode)
+                FlushIfDirty();
+            else if (syncMode == SyncMode.None)
+                PersistIfNeeded();
             return;
         }
 #endif
         if (!Transform2DBehaviourSettings.DeferredWriteMode && syncMode == SyncMode.WriteToUnity)
-        {
             FlushIfDirty();
-            // 仍延迟到 LateUpdate 做一次性批处理，但这里提前一次保障编辑体验
-        }
     }
 
     private void PersistIfNeeded()
     {
         if (!_pendingPersist) return;
+
+#if UNITY_EDITOR
+        // 退出 Play 后首帧若不采纳运行期状态则丢弃一次持久化
+        if (s_JustExitedPlay && !adoptUnityOnPlayInWriteMode)
+        {
+            _pendingPersist = false;
+            return;
+        }
+#endif
+        bool playing = Application.isPlaying;
+#if UNITY_EDITOR
+        bool allow = playing ? Transform2DBehaviourSettings.PlayModePersistEnabled
+                             : Transform2DBehaviourSettings.EditorPersistEnabled;
+#else
+        bool allow = Transform2DBehaviourSettings.PlayModePersistEnabled;
+#endif
+        if (!allow)
+        {
+            _pendingPersist = false; // 丢弃
+            return;
+        }
         _storedLocalPosition = _node.localPosition;
         _storedLocalRotation = _node.localRotationDegrees;
         _storedLocalScale = _node.localScale;
@@ -243,20 +237,12 @@ public class Transform2DBehaviour : MonoBehaviour
         _dirtyLocal = false;
         _writeAppliedThisFrame = true;
     }
-
-    private void RestoreNodeFromStored()
-    {
-        _node.localPosition = _storedLocalPosition;
-        _node.localRotationDegrees = _storedLocalRotation;
-        _node.localScale = _storedLocalScale;
-    }
     #endregion
 
-    #region 同步（修改 ReadFromUnityTransform 仅使用 localPosition）
+    #region 同步
     public void ReadFromUnityTransform()
     {
-        // 修复：原实现使用 transform.position（世界坐标）导致有父层级时回写错误。
-        Vector3 lp = transform.localPosition;
+        var lp = transform.localPosition;
         float rotZ = transform.localRotation.eulerAngles.z;
         Vector3 scl3 = readScaleFromLocal ? transform.localScale : transform.lossyScale;
 
@@ -280,20 +266,18 @@ public class Transform2DBehaviour : MonoBehaviour
         var lr = _node.localRotationDegrees;
         var ls = _node.localScale;
 
-        // 仅改 X/Y，保持 Z
         transform.localPosition = new Vector3(lp.x, lp.y, transform.localPosition.z);
 
         float curRotZ = transform.localRotation.eulerAngles.z;
         if (Mathf.Abs(Mathf.DeltaAngle(curRotZ, lr)) > kRotEps)
             transform.localRotation = Quaternion.Euler(0, 0, lr);
 
-        float curLSZ = transform.localScale.z;
-        float targetZ = applyScaleZAsOne ? 1f : curLSZ;
+        float targetZ = applyScaleZAsOne ? 1f : transform.localScale.z;
         transform.localScale = new Vector3(ls.x, ls.y, targetZ);
     }
     #endregion
 
-    #region 强制 API（仅当前实例）
+    #region Force API
     public bool IsDirty => _dirtyLocal;
 
     public void ForceFlush(bool persist = true)
@@ -301,22 +285,14 @@ public class Transform2DBehaviour : MonoBehaviour
         if (syncMode != SyncMode.WriteToUnity) return;
         WriteToUnityTransform();
         _dirtyLocal = false;
-        if (persist)
-        {
-            _pendingPersist = true;
-            PersistIfNeeded();
-        }
+        if (persist) { _pendingPersist = true; PersistIfNeeded(); }
     }
 
     public void ForceReadFromUnity(bool persist = true, bool overrideWriteMode = false)
     {
         if (syncMode == SyncMode.WriteToUnity && !overrideWriteMode) return;
         ReadFromUnityTransform();
-        if (persist && !_pendingPersist)
-        {
-            _pendingPersist = true;
-            PersistIfNeeded();
-        }
+        if (persist) { _pendingPersist = true; PersistIfNeeded(); }
         _dirtyLocal = false;
     }
 
@@ -341,20 +317,6 @@ public class Transform2DBehaviour : MonoBehaviour
         _dirtyLocal = true;
         _pendingPersist = true;
     }
-    #endregion
-
-    #region 编辑器
-    private void OnValidate()
-    {
-        if (!isActiveAndEnabled) return;
-        RestoreNodeFromStored();
-        if (syncMode == SyncMode.ReadFromUnity) ReadFromUnityTransform();
-        else if (syncMode == SyncMode.WriteToUnity)
-        {
-            _dirtyLocal = true;
-            FlushIfDirty();
-        }
-    }
 
 #if UNITY_EDITOR
     public void EditorForceApply()
@@ -376,6 +338,18 @@ public class Transform2DBehaviour : MonoBehaviour
     #endregion
 
 #if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (!isActiveAndEnabled) return;
+        RestoreNodeFromStored();
+        if (syncMode == SyncMode.ReadFromUnity) ReadFromUnityTransform();
+        else if (syncMode == SyncMode.WriteToUnity)
+        {
+            _dirtyLocal = true;
+            FlushIfDirty();
+        }
+    }
+
     private void OnDrawGizmosSelected()
     {
         var world = _node.WorldMatrix4x4;

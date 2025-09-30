@@ -1,3 +1,4 @@
+
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
@@ -26,7 +27,6 @@ public class Transform2DBehaviourEditor : Editor
         {
             Undo.RecordObject(t, "Edit Transform2DBehaviour");
             t.SetLocalTRSDegrees(lp, lr, ls);
-            t.EditorForceApply();
             EditorUtility.SetDirty(t);
         }
 
@@ -39,16 +39,22 @@ public class Transform2DBehaviourEditor : Editor
             EditorGUILayout.Vector2Field("World Scale", t.worldScale);
         }
 
-        if (GUILayout.Button("Force Read From Unity") && t.syncMode == Transform2DBehaviour.SyncMode.ReadFromUnity)
+        EditorGUILayout.Space();
+        using (new EditorGUILayout.HorizontalScope())
         {
-            t.ReadFromUnityTransform();
-            EditorUtility.SetDirty(t);
-        }
+            if (GUILayout.Button("Force Read From Unity") && t.syncMode == Transform2DBehaviour.SyncMode.ReadFromUnity)
+            {
+                Undo.RecordObject(t, "Force Read Transform2DBehaviour");
+                t.ReadFromUnityTransform();
+                EditorUtility.SetDirty(t);
+            }
 
-        if (GUILayout.Button("Force Write To Unity") && t.syncMode == Transform2DBehaviour.SyncMode.WriteToUnity)
-        {
-            t.WriteToUnityTransform();
-            EditorUtility.SetDirty(t);
+            if (GUILayout.Button("Force Write To Unity") && t.syncMode == Transform2DBehaviour.SyncMode.WriteToUnity)
+            {
+                Undo.RecordObject(t, "Force Write Transform2DBehaviour");
+                t.WriteToUnityTransform();
+                EditorUtility.SetDirty(t);
+            }
         }
     }
 }
