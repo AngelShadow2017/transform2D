@@ -21,7 +21,6 @@ using UnityEngine;
 /// 4. 禁止外部修改世界缩放：无任何 SetWorldScale / lossyScale setter。
 /// 5. SetParent(keepWorld=true) 时通过矩阵反求 local（精确，不估算）
 /// </summary>
-[BurstCompile(OptimizeFor = OptimizeFor.Performance)]
 public class Transform2DFixed
 {
     #region 字段
@@ -103,6 +102,8 @@ public class Transform2DFixed
     public TSVector2 worldPosition    { get { UpdateWorld(); return _worldPosition; } }
     public FP   worldRotationDeg { get { UpdateWorld(); return _worldRotation * FP.Rad2Deg; } }
     public FP   WorldRotationRad { get { UpdateWorld(); return _worldRotation; } }
+    
+    //超过2级的应该实现是错的，和unity不一致，尽量不要用这个
     public TSVector2 worldScale       { get { UpdateWorld(); return _worldScale; } } // (公式法 lossyScale)
     public TSVector2 lossyScale       => worldScale;
     public int2 signAccum        { get { UpdateWorld(); return _signAccum; } }
@@ -297,7 +298,7 @@ public class Transform2DFixed
     #endregion
 
     #region 世界操作（仅位置/旋转）
-    public void SetWorldPosition(TSVector2 wpos)
+    public void SetWorldPosition(in TSVector2 wpos)
     {
         if (_parent == null)
             localPosition = wpos;
@@ -308,8 +309,8 @@ public class Transform2DFixed
         }
     }
 
-    public void SetWorldRotationDegrees(FP deg) => SetWorldRotationRad(deg * FP.Deg2Rad);
-    public void SetWorldRotationRad(FP desiredWorldRot)
+    public void SetWorldRotationDegrees(in FP deg) => SetWorldRotationRad(deg * FP.Deg2Rad);
+    public void SetWorldRotationRad(in FP desiredWorldRot)
     {
         if (_parent == null)
         {
@@ -328,10 +329,10 @@ public class Transform2DFixed
     #endregion
 
     #region Local 批量设置
-    public void SetLocalTRSDegrees(TSVector2 pos, FP rotDeg, TSVector2 scale)
+    public void SetLocalTRSDegrees(in TSVector2 pos, in FP rotDeg, in TSVector2 scale)
         => SetLocalTRSRad(pos, rotDeg * FP.Deg2Rad, scale);
 
-    public void SetLocalTRSRad(TSVector2 pos, FP rotRad, TSVector2 scale)
+    public void SetLocalTRSRad(in TSVector2 pos, FP rotRad, in TSVector2 scale)
     {
         bool changed = false;
         if (_localPosition != pos) { _localPosition = pos; changed = true; }
@@ -365,12 +366,12 @@ public class Transform2DFixed
     #endregion
 
     #region 变换函数
-    public TSVector2 TransformPoint(TSVector2 p)             { UpdateWorld(); return _worldMatrix.MultiplyPoint(p); }
-    public TSVector2 InverseTransformPoint(TSVector2 p)      { UpdateWorld(); return _worldMatrix.Inverse().MultiplyPoint(p); }
-    public TSVector2 TransformDirection(TSVector2 d)         { UpdateWorld(); return _worldMatrix.MultiplyVector(d); }
-    public TSVector2 InverseTransformDirection(TSVector2 d)  { UpdateWorld(); return _worldMatrix.Inverse().MultiplyVector(d); }
+    public TSVector2 TransformPoint(in TSVector2 p)             { UpdateWorld(); return _worldMatrix.MultiplyPoint(p); }
+    public TSVector2 InverseTransformPoint(in TSVector2 p)      { UpdateWorld(); return _worldMatrix.Inverse().MultiplyPoint(p); }
+    public TSVector2 TransformDirection(in TSVector2 d)         { UpdateWorld(); return _worldMatrix.MultiplyVector(d); }
+    public TSVector2 InverseTransformDirection(in TSVector2 d)  { UpdateWorld(); return _worldMatrix.Inverse().MultiplyVector(d); }
 
-    public void Translate(TSVector2 delta, Space space = Space.Self)
+    public void Translate(in TSVector2 delta, in Space space = Space.Self)
     {
         if (space == Space.Self)
         {
@@ -391,7 +392,7 @@ public class Transform2DFixed
         }
     }
 
-    public void Rotate(FP deltaDegrees, Space space = Space.Self)
+    public void Rotate(in FP deltaDegrees, in Space space = Space.Self)
     {
         if (space == Space.Self)
             localRotationDegrees = localRotationDegrees + deltaDegrees;
@@ -399,7 +400,7 @@ public class Transform2DFixed
             rotationDeg = rotationDeg + deltaDegrees;
     }
 
-    public void LookAt(TSVector2 worldPoint)
+    public void LookAt(in TSVector2 worldPoint)
     {
         TSVector2 dir = worldPoint - worldPosition;
         if (dir.LengthSquared() < FP.EN7) return;
@@ -407,7 +408,7 @@ public class Transform2DFixed
         SetWorldRotationRad(ang);
     }
 
-    public FP GetAngleTo(TSVector2 worldPoint)
+    public FP GetAngleTo(in TSVector2 worldPoint)
     {
         TSVector2 dir = worldPoint - worldPosition;
         if (dir.LengthSquared() < FP.EN7) return FP.Zero;
@@ -426,9 +427,11 @@ public class Transform2DFixed
     #endregion
 
     #region 分解 & 工具
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void DecomposePureRS(TMatrix2x3 m, out TSVector2 pos, out FP rot, out TSVector2 scale)
     {
-        pos = new TSVector2(m.m02, m.m12);
+        Transform2DFixedHelper.DecomposePureRS(m, out pos, out rot, out scale);
+        /*pos = new TSVector2(m.m02, m.m12);
 
         // 线性部分 A = [a b; c d] = R * S (S 对角)
         FP a = m.m00; FP b = m.m01;
@@ -448,9 +451,9 @@ public class Transform2DFixed
 
         scale = new TSVector2(s00, s11);
 
-        rot = NormalizeRad(rot);
+        rot = NormalizeRad(rot);*/
     }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static FP NormalizeRad(FP a)
     {
         /*
@@ -458,32 +461,19 @@ public class Transform2DFixed
         if (a <= -FP.Pi) a += FP.PiTimes2;
         if (a >  FP.Pi)  a -= FP.PiTimes2;
         */
-        NormalizeRad(ref a);
+        Transform2DFixedHelper.NormalizeRad(ref a);
         return a;
     }
-    [BurstCompile,MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void NormalizeRad(ref FP a)
-    {
-        a %= (FP.PiTimes2);
-        if (a <= 0-FP.Pi) a += FP.PiTimes2;
-        if (a >  FP.Pi)  a -= FP.PiTimes2;
-    }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static TSVector2 SanitizeScale(TSVector2 s)
     {
         //if (FP.Abs(s.x) < MIN_ABS_SCALE) s.x = (s.x >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
         //if (FP.Abs(s.y) < MIN_ABS_SCALE) s.y = (s.y >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
-        SanitizeScale(ref s);
+        Transform2DFixedHelper.SanitizeScale(ref s);
         return s;
     }
-    [BurstCompile,MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void SanitizeScale(ref TSVector2 s)
-    {
-        if (FP.Abs(s.x) < MIN_ABS_SCALE) s.x = (s.x >= 0 ? MIN_ABS_SCALE : 0-MIN_ABS_SCALE);
-        if (FP.Abs(s.y) < MIN_ABS_SCALE) s.y = (s.y >= 0 ? MIN_ABS_SCALE : 0-MIN_ABS_SCALE);
-    }
-
-    private static int SignNonZero(FP v) => v < 0 ? -1 : 1;
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int SignNonZero(in FP v) => v < 0 ? -1 : 1;
     #endregion
 
     #region 调试
@@ -529,4 +519,62 @@ public class Transform2DFixed
         SetParent(parent, keepWorld);
     }
     #endregion
+}
+
+[BurstCompile(OptimizeFor = OptimizeFor.Performance)]
+public static class Transform2DFixedHelper
+{
+    private static readonly FP MIN_ABS_SCALE = FP.EN6;
+    
+    
+    
+    [BurstCompile,MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void SanitizeScale(ref TSVector2 s)
+    {
+        if (FP.Abs(s.x) < MIN_ABS_SCALE) s.x = (s.x >= 0 ? MIN_ABS_SCALE : 0-MIN_ABS_SCALE);
+        if (FP.Abs(s.y) < MIN_ABS_SCALE) s.y = (s.y >= 0 ? MIN_ABS_SCALE : 0-MIN_ABS_SCALE);
+    }
+    [BurstCompile,MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Mod(ref long a,in long b)
+    {
+        a = a == FP.MIN_VALUE & b == -1 ?
+            0 :
+            a % b;
+    }
+
+    [BurstCompile,MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void NormalizeRad(ref FP a)
+    {
+        Mod(ref a._serializedValue,FP.PI_TIMES_2);
+        if (a._serializedValue <= -FP.PI) a._serializedValue+=FP.PI_TIMES_2;
+        if (a._serializedValue >  FP.PI)  a._serializedValue -= FP.PI_TIMES_2;
+        //a %= (FP.PiTimes2);
+        //if (a <= 0-FP.Pi) a += FP.PiTimes2;
+        //if (a >  FP.Pi)  a -= FP.PiTimes2;
+    }
+    [BurstCompile,MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void DecomposePureRS(in TMatrix2x3 m, out TSVector2 pos, out FP rot, out TSVector2 scale)
+    {
+        pos = new TSVector2(m.m02, m.m12);
+
+        // 线性部分 A = [a b; c d] = R * S (S 对角)
+        FP a = m.m00; FP b = m.m01;
+        FP c = m.m10; FP d = m.m11;
+
+        rot = FP.Atan2(c, a); // R 的角度
+        FP cosR = FP.FastCos(rot);
+        FP sinR = FP.FastSin(rot);
+
+        // S = R^T * A
+        FP s00 =  cosR * a + sinR * c;
+        FP s11 = (0-sinR) * b + cosR * d;
+
+        // 防止极小
+        if (FP.Abs(s00) < MIN_ABS_SCALE) s00 = (s00 >= 0 ? MIN_ABS_SCALE : 0-MIN_ABS_SCALE);
+        if (FP.Abs(s11) < MIN_ABS_SCALE) s11 = (s11 >= 0 ? MIN_ABS_SCALE : 0-MIN_ABS_SCALE);
+
+        scale = new TSVector2(s00, s11);
+
+        NormalizeRad(ref rot);
+    }
 }
