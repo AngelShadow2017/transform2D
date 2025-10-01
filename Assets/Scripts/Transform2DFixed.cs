@@ -154,12 +154,13 @@ public class Transform2DFixed
     #endregion
 
     #region Dirty
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MarkLocalDirty()
     {
         _localDirty = true;
         MarkWorldDirty();
     }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MarkWorldDirty()
     {
         if (_worldDirty) return;
@@ -298,6 +299,7 @@ public class Transform2DFixed
     #endregion
 
     #region 世界操作（仅位置/旋转）
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetWorldPosition(in TSVector2 wpos)
     {
         if (_parent == null)
@@ -308,8 +310,9 @@ public class Transform2DFixed
             localPosition = invParent.MultiplyPoint(wpos);
         }
     }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetWorldRotationDegrees(in FP deg) => SetWorldRotationRad(deg * FP.Deg2Rad);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetWorldRotationRad(in FP desiredWorldRot)
     {
         if (_parent == null)
@@ -329,9 +332,10 @@ public class Transform2DFixed
     #endregion
 
     #region Local 批量设置
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetLocalTRSDegrees(in TSVector2 pos, in FP rotDeg, in TSVector2 scale)
         => SetLocalTRSRad(pos, rotDeg * FP.Deg2Rad, scale);
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetLocalTRSRad(in TSVector2 pos, FP rotRad, in TSVector2 scale)
     {
         bool changed = false;
@@ -363,14 +367,50 @@ public class Transform2DFixed
         var w = GetWorldTRSRad();
         return (w.position, w.rotationRad * FP.Rad2Deg, w.scale);
     }
+    
     #endregion
 
     #region 变换函数
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public TSVector2 TransformPoint(in TSVector2 p)             { UpdateWorld(); return _worldMatrix.MultiplyPoint(p); }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public TSVector2 InverseTransformPoint(in TSVector2 p)      { UpdateWorld(); return _worldMatrix.Inverse().MultiplyPoint(p); }
-    public TSVector2 TransformDirection(in TSVector2 d)         { UpdateWorld(); return _worldMatrix.MultiplyVector(d); }
-    public TSVector2 InverseTransformDirection(in TSVector2 d)  { UpdateWorld(); return _worldMatrix.Inverse().MultiplyVector(d); }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public TSVector2 TransformDirection(in TSVector2 d)
+    {
+        // 仅旋转，不受缩放与反射符号影响（与 Translate 自空间逻辑保持一致）
+        UpdateWorld();
+        FP r = _worldRotation;
+        FP c = FP.FastCos(r);
+        FP s = FP.FastSin(r);
+        return new TSVector2(c * d.x - s * d.y, s * d.x + c * d.y);
+    }
+    
+// 原先含缩放/反射的行为若仍需要，可改名保留
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public TSVector2 TransformVector(in TSVector2 v)
+    {
+        UpdateWorld();
+        return _worldMatrix.MultiplyVector(v); // 含缩放与反射
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public TSVector2 InverseTransformDirection(in TSVector2 d)
+    {
+        // 逆纯旋转：使用 -worldRotation
+        UpdateWorld();
+        FP r = -_worldRotation;
+        FP c = FP.FastCos(r);
+        FP s = FP.FastSin(r);
+        return new TSVector2(c * d.x - s * d.y, s * d.x + c * d.y);
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public TSVector2 InverseTransformVector(in TSVector2 v)
+    {
+        // 含缩放/反射逆
+        UpdateWorld();
+        var inv = _worldMatrix.Inverse();
+        return inv.MultiplyVector(v);
+    }
     public void Translate(in TSVector2 delta, in Space space = Space.Self)
     {
         if (space == Space.Self)
@@ -391,7 +431,7 @@ public class Transform2DFixed
             SetWorldPosition(worldPosition + delta);
         }
     }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Rotate(in FP deltaDegrees, in Space space = Space.Self)
     {
         if (space == Space.Self)
@@ -399,7 +439,7 @@ public class Transform2DFixed
         else
             rotationDeg = rotationDeg + deltaDegrees;
     }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void LookAt(in TSVector2 worldPoint)
     {
         TSVector2 dir = worldPoint - worldPosition;
@@ -407,7 +447,7 @@ public class Transform2DFixed
         FP ang = FP.Atan2(dir.y, dir.x);
         SetWorldRotationRad(ang);
     }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public FP GetAngleTo(in TSVector2 worldPoint)
     {
         TSVector2 dir = worldPoint - worldPosition;
@@ -418,6 +458,7 @@ public class Transform2DFixed
     #endregion
 
     #region 递归刷新
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void RecalculateWorldRecursive()
     {
         UpdateWorld();

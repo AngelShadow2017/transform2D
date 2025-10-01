@@ -408,9 +408,42 @@ public class CachedTransform2DNode
     #region 变换函数
     public Vector2 TransformPoint(Vector2 p)             { UpdateWorld(); return _worldMatrix.MultiplyPoint(p); }
     public Vector2 InverseTransformPoint(Vector2 p)      { UpdateWorld(); return _worldMatrix.Inverse().MultiplyPoint(p); }
-    public Vector2 TransformDirection(Vector2 d)         { UpdateWorld(); return _worldMatrix.MultiplyVector(d); }
-    public Vector2 InverseTransformDirection(Vector2 d)  { UpdateWorld(); return _worldMatrix.Inverse().MultiplyVector(d); }
+    //public Vector2 TransformDirection(Vector2 d)         { UpdateWorld(); return _worldMatrix.MultiplyVector(d); }
+    //public Vector2 InverseTransformDirection(Vector2 d)  { UpdateWorld(); return _worldMatrix.Inverse().MultiplyVector(d); }
+    public Vector2 TransformDirection(Vector2 d)
+    {
+        // 仅旋转，不受缩放与反射符号影响（与 Translate 自空间逻辑保持一致）
+        UpdateWorld();
+        float r = _worldRotation;
+        float c = Mathf.Cos(r);
+        float s = Mathf.Sin(r);
+        return new Vector2(c * d.x - s * d.y, s * d.x + c * d.y);
+    }
 
+// 原先含缩放/反射的行为若仍需要，可改名保留
+    public Vector2 TransformVector(Vector2 v)
+    {
+        UpdateWorld();
+        return _worldMatrix.MultiplyVector(v); // 含缩放与反射
+    }
+
+    public Vector2 InverseTransformDirection(Vector2 d)
+    {
+        // 逆纯旋转：使用 -worldRotation
+        UpdateWorld();
+        float r = -_worldRotation;
+        float c = Mathf.Cos(r);
+        float s = Mathf.Sin(r);
+        return new Vector2(c * d.x - s * d.y, s * d.x + c * d.y);
+    }
+
+    public Vector2 InverseTransformVector(Vector2 v)
+    {
+        // 含缩放/反射逆
+        UpdateWorld();
+        var inv = _worldMatrix.Inverse();
+        return inv.MultiplyVector(v);
+    }
     public void Translate(Vector2 delta, Space space = Space.Self)
     {
         if (space == Space.Self)
