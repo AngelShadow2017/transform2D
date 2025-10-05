@@ -160,12 +160,26 @@ public struct TMatrix3x4
     #endregion
 
     #region 工具函数 (可扩展)
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static TMatrix3x4 FromLinearTranslation(
+    /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static TMatrix3x4 FromLinearTranslation2(
         FP a00, FP a01, FP a02,
         FP a10, FP a11, FP a12,
         FP a20, FP a21, FP a22,
         FP tx, FP ty, FP tz)
+    {
+        return new TMatrix3x4
+        {
+            m00 = a00, m01 = a01, m02 = a02, m03 = tx,
+            m10 = a10, m11 = a11, m12 = a12, m13 = ty,
+            m20 = a20, m21 = a21, m22 = a22, m23 = tz
+        };
+    }*/
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static TMatrix3x4 FromLinearTranslation(
+        FP a00, FP a01, FP a02,FP tx,
+        FP a10, FP a11, FP a12,FP ty,
+        FP a20, FP a21, FP a22,FP tz
+          )
     {
         return new TMatrix3x4
         {

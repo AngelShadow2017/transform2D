@@ -18,7 +18,9 @@
 */
 
 using System;
+using System.Runtime.CompilerServices;
 using MessagePack;
+using Unity.Burst;
 
 namespace Core.TrueSync
 {
@@ -26,7 +28,7 @@ namespace Core.TrueSync
     /// <summary>
     /// A Quaternion representing an orientation.
     /// </summary>
-    [Serializable]
+    [Serializable,BurstCompile(OptimizeFor = OptimizeFor.Performance)]
     [MessagePackObject]
     public struct TSQuaternion
     {
@@ -377,12 +379,23 @@ namespace Core.TrueSync
         #region public void Normalize()
         public void Normalize()
         {
-            FP num2 = (((this.x * this.x) + (this.y * this.y)) + (this.z * this.z)) + (this.w * this.w);
+            Normalize(ref this);
+        }
+        [BurstCompile,MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Normalize(in TSQuaternion quaternion, out TSQuaternion result)
+        {
+            result = quaternion;
+            Normalize(ref result);
+        }
+        [BurstCompile,MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Normalize(ref TSQuaternion result)
+        {
+            FP num2 = (((result.x * result.x) + (result.y * result.y)) + (result.z * result.z)) + (result.w * result.w);
             FP num = 1 / (FP.Sqrt(num2));
-            this.x *= num;
-            this.y *= num;
-            this.z *= num;
-            this.w *= num;
+            result.x *= num;
+            result.y *= num;
+            result.z *= num;
+            result.w *= num;
         }
         #endregion
 
@@ -520,5 +533,9 @@ namespace Core.TrueSync
             return string.Format("({0:f1}, {1:f1}, {2:f1}, {3:f1})", x.AsFloat(), y.AsFloat(), z.AsFloat(), w.AsFloat());
         }
 
+        public static bool ValueEquals(in TSQuaternion a, in TSQuaternion b)
+        {
+            return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;
+        }
     }
 }

@@ -57,15 +57,15 @@ using Unity.Burst;
         static void Inverse(in TMatrix2x3 a, ref TMatrix2x3 r)
         {
             FP det = a.m00 * a.m11 - a.m01 * a.m10;
-            if (det==FP.Zero) throw new InvalidOperationException("Matrix not invertible.");
-            FP inv = FP.One / det;
+            if (det==0) throw new InvalidOperationException("Matrix not invertible.");
+            FP inv = 1 / det;
             r.m00 =  a.m11 * inv;
-            r.m01 = -a.m01 * inv;
-            r.m02 = -(r.m00 * a.m02 + r.m01 * a.m12);
+            r.m01 = 0-a.m01 * inv;
+            r.m02 = 0-(r.m00 * a.m02 + r.m01 * a.m12);
 
-            r.m10 = -a.m10 * inv;
+            r.m10 = 0-a.m10 * inv;
             r.m11 =  a.m00 * inv;
-            r.m12 = -(r.m10 * a.m02 + r.m11 * a.m12);
+            r.m12 = 0-(r.m10 * a.m02 + r.m11 * a.m12);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

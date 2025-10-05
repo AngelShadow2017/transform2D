@@ -1,41 +1,64 @@
-#if false
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using UnityEngine; // 仅用于调试的 Matrix4x4（可去掉）
-using Core.TrueSync; // 假设你的 FP / 向量 / 四元数 / 矩阵都在此命名空间
+using Core.TrueSync;
+using UnityEngine;
 
-/// <summary>
-/// 3D 固定点层级变换节点：
-/// - 显式存储 localPosition / localRotation(Quaternion) / localScale
-/// - world：仅缓存 worldPosition / worldRotation / worldMatrix（以及其逆矩阵）
-/// - 不缓存 worldScale（有需要时请通过矩阵即时分解）
-/// - 不做 2D 版的“奇反射”旋转加减法规则；直接使用四元数乘法：worldRot = parentRot * localRot
-/// - SetParent(keepWorld = true) 时用矩阵分解反推 local TRS
-/// - Translate(Space.Self) 使用纯旋转基向量（不受缩放或反射影响）
-/// </summary>
+/*
+ * 3D 固定点 Transform（纯 TRS，无显式 shear 存储）。
+ * 实现要点：
+ *   R_world = Π R_i
+ *   W_world = Π (R_i * S_i)      // 不再取 abs
+ *   S_world = R_world^T * W_world
+ *   worldScale(lossyScale) = diag(S_world)
+ *
+ * 若有非均匀缩放 + 下级旋转 => W_world 包含 shear，使 S_world 非对角，diag 只是近似（与 Unity 文档一致）。
+ * 可选：SetParent 保持世界时两种策略：
+ *   1) USE_PURE_RS_DECOMPOSE = true  (通过 worldMatrix 反解 local，吸收 shear)
+ *   2) 否则用公式近似（保持 worldRotation / worldScale 近似）
+ *
+ * 仍保留 signAccum（如果不要，可删除），对世界缩放值不再必需。
+ */
+
 public class Transform3DFixed
 {
+    #region Config
+    private const bool USE_PURE_RS_DECOMPOSE = true;
+    private const bool SCALE_RETAIN_ITERATE = false; // 仅在公式回推模式时用于一次迭代修正
+    #endregion
+
     #region Fields
     private Transform3DFixed _parent;
     private readonly HashSet<Transform3DFixed> _children = new();
 
-    // Local
+    // Local TRS
     private TSVector _localPosition = TSVector.zero;
     private TSQuaternion _localRotation = TSQuaternion.identity;
-    private TSVector _localScale = TSVector.one;
+    private TSVector _localScale = TSVector.one; // 可含负
 
-    // Cached matrices (3x4 仿射：线性3x3 + 平移)
+    // Matrices
     private TMatrix3x4 _localMatrix = TMatrix3x4.Identity;
     private TMatrix3x4 _worldMatrix = TMatrix3x4.Identity;
-
-    // Inverse (lazy)
-    private TMatrix3x4 _worldMatrixInv = TMatrix3x4.Identity;
+    private TMatrix3x4 _worldInv = TMatrix3x4.Identity;
     private bool _worldInvDirty = true;
 
-    // World (cached)
+    // World cached
     private TSVector _worldPosition = TSVector.zero;
     private TSQuaternion _worldRotation = TSQuaternion.identity;
+    private TSVector _worldScale = TSVector.one;
+
+    // 纯旋转累积 R_world
+    private FP _rw00=FP.One,_rw01=FP.Zero,_rw02=FP.Zero;
+    private FP _rw10=FP.Zero,_rw11=FP.One,_rw12=FP.Zero;
+    private FP _rw20=FP.Zero,_rw21=FP.Zero,_rw22=FP.One;
+
+    // W_world = Π (R_i * S_i)
+    private FP _ww00=FP.One,_ww01=FP.Zero,_ww02=FP.Zero;
+    private FP _ww10=FP.Zero,_ww11=FP.One,_ww12=FP.Zero;
+    private FP _ww20=FP.Zero,_ww21=FP.Zero,_ww22=FP.One;
+
+    // 符号链（调试用，可移除）
+    private int _signX = 1, _signY = 1, _signZ = 1;
 
     private bool _localDirty = true;
     private bool _worldDirty = true;
@@ -47,30 +70,13 @@ public class Transform3DFixed
     public TSVector localPosition
     {
         get => _localPosition;
-        set
-        {
-            if (_localPosition != value)
-            {
-                _localPosition = value;
-                MarkLocalDirty();
-            }
-        }
+        set { if (_localPosition != value) { _localPosition = value; MarkLocalDirty(); } }
     }
-
     public TSQuaternion localRotation
     {
         get => _localRotation;
-        set
-        {
-            // Assumes caller provides normalized or near-normalized quaternion
-            if (_localRotation != value)
-            {
-                _localRotation = value; // 可在此 Normalize
-                MarkLocalDirty();
-            }
-        }
+        set { if (!TSQuaternion.ValueEquals(_localRotation,value)) { _localRotation = value; MarkLocalDirty(); } }
     }
-
     public TSVector localScale
     {
         get => _localScale;
@@ -86,65 +92,115 @@ public class Transform3DFixed
     }
     #endregion
 
-    #region World Readonly Properties
+    #region World Readonly
     public TSVector worldPosition { get { UpdateWorld(); return _worldPosition; } }
     public TSQuaternion worldRotation { get { UpdateWorld(); return _worldRotation; } }
-
-    // Unity-like shortcuts
-    public TSVector position { get => worldPosition; set => SetWorldPosition(value); }
-    public TSQuaternion rotation { get => worldRotation; set => SetWorldRotation(value); }
+    public TSVector worldScale { get { UpdateWorld(); return _worldScale; } }
+    public TSVector lossyScale => worldScale;
 
     public TMatrix3x4 worldMatrix { get { UpdateWorld(); return _worldMatrix; } }
     public TMatrix3x4 localMatrix { get { UpdateLocal(); return _localMatrix; } }
+    public TMatrix3x4 worldMatrixInverse { get { UpdateWorldInverse(); return _worldInv; } }
 
-    public TMatrix3x4 worldMatrixInverse { get { UpdateWorldInverse(); return _worldMatrixInv; } }
+    public (int x,int y,int z) signAccum { get { UpdateWorld(); return (_signX,_signY,_signZ); } }
     #endregion
 
     #region Hierarchy
     public Transform3DFixed parent => _parent;
 
-    public void SetParent(Transform3DFixed newParent, bool keepWorld = true)
+    public void SetParent(Transform3DFixed newParent, bool keepWorld = true, bool keepWorldScale = true)
     {
         if (_parent == newParent) return;
 
-        // Snapshot current world
         UpdateWorld();
+        TSVector cachedPos = _worldPosition;
+        TSQuaternion cachedRot = _worldRotation;
+        TSVector cachedWorldScale = _worldScale;
         TMatrix3x4 oldWorld = _worldMatrix;
 
         if (_parent != null) _parent._children.Remove(this);
         _parent = newParent;
         if (_parent != null) _parent._children.Add(this);
 
-        MarkWorldDirty();
+        if (!keepWorld)
+        {
+            MarkWorldDirty();
+            return;
+        }
 
-        if (keepWorld)
+        if (USE_PURE_RS_DECOMPOSE)
         {
             if (_parent == null)
             {
-                // Decompose oldWorld → new local
-                Transform3DFixedHelper.DecomposeTRS(oldWorld, out _localPosition, out _localRotation, out _localScale);
+                DecomposePureRS3D(oldWorld, out _localPosition, out _localRotation, out _localScale);
             }
             else
             {
                 var invParent = _parent.worldMatrixInverse;
                 var newLocal = invParent * oldWorld;
-                Transform3DFixedHelper.DecomposeTRS(newLocal, out _localPosition, out _localRotation, out _localScale);
+                DecomposePureRS3D(newLocal, out _localPosition, out _localRotation, out _localScale);
             }
-            _localDirty = true;
-            MarkWorldDirty();
+            if (!keepWorldScale)
+            {
+                // 可在此恢复原 localScale，如果想忽略世界缩放保持
+                // _localScale = _localScale;
+            }
         }
+        else
+        {
+            if (_parent == null)
+            {
+                _localPosition = cachedPos;
+                _localRotation = cachedRot;
+                if (keepWorldScale)
+                    _localScale = SanitizeScale(cachedWorldScale);
+            }
+            else
+            {
+                _parent.UpdateWorld();
+                var invParentRot = TSQuaternion.Inverse(_parent._worldRotation);
+                _localRotation = invParentRot * cachedRot;
+                _localRotation.Normalize();
+
+                var invPMat = _parent.worldMatrixInverse;
+                _localPosition = invPMat.MultiplyPoint(cachedPos);
+
+                if (keepWorldScale)
+                {
+                    _localScale = InitialLocalScaleFromWorld(cachedWorldScale, _parent._worldScale);
+                    _localScale = SanitizeScale(_localScale);
+
+                    if (SCALE_RETAIN_ITERATE)
+                    {
+                        MarkLocalDirty();
+                        UpdateWorld();
+                        TSVector predicted = _worldScale;
+                        FP px = FP.Abs(predicted.x) < MIN_ABS_SCALE ? MIN_ABS_SCALE : predicted.x;
+                        FP py = FP.Abs(predicted.y) < MIN_ABS_SCALE ? MIN_ABS_SCALE : predicted.y;
+                        FP pz = FP.Abs(predicted.z) < MIN_ABS_SCALE ? MIN_ABS_SCALE : predicted.z;
+                        TSVector ratio = new TSVector(cachedWorldScale.x / px,
+                                                      cachedWorldScale.y / py,
+                                                      cachedWorldScale.z / pz);
+                        _localScale = SanitizeScale(new TSVector(_localScale.x * ratio.x,
+                                                                 _localScale.y * ratio.y,
+                                                                 _localScale.z * ratio.z));
+                        MarkLocalDirty();
+                    }
+                }
+            }
+        }
+
+        _localDirty = true;
+        MarkWorldDirty();
     }
     #endregion
 
-    #region Dirty Flags
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    #region Dirty
     private void MarkLocalDirty()
     {
         _localDirty = true;
         MarkWorldDirty();
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MarkWorldDirty()
     {
         if (_worldDirty) return;
@@ -155,259 +211,254 @@ public class Transform3DFixed
     }
     #endregion
 
-    #region Update Routines
+    #region UpdateLocal
     private void UpdateLocal()
     {
         if (!_localDirty) return;
 
-        // Build localMatrix = R * S (linear) + T
-        // Rotation matrix from quaternion
-        TSQuaternion q = _localRotation; // 确保已归一
-        FP xx = q.x + q.x;
-        FP yy = q.y + q.y;
-        FP zz = q.z + q.z;
-        FP xy = q.x * yy;
-        FP xz = q.x * zz;
-        FP yz = q.y * zz;
-        FP wx = q.w * xx;
-        FP wy = q.w * yy;
-        FP wz = q.w * zz;
-        FP xx2 = q.x * xx;
-        FP yy2 = q.y * yy;
-        FP zz2 = q.z * zz;
+        TSQuaternion q = _localRotation;
+        FP xx = q.x * q.x;
+        FP yy = q.y * q.y;
+        FP zz = q.z * q.z;
+        FP xy = q.x * q.y;
+        FP xz = q.x * q.z;
+        FP yz = q.y * q.z;
+        FP wx = q.w * q.x;
+        FP wy = q.w * q.y;
+        FP wz = q.w * q.z;
+        FP two = (FP)2;
 
-        // 标准四元数→矩阵（行主 / 列主要与 TMatrix3x4 的定义匹配，这里假设与 2D 一致：m00 m01 m02 为第一列的 x,y,z 分量? 
-        // 由于未知 TMatrix3x4 内部布局，你需按自己的实现调整。
-        // 下列写法假设与 Unity 一样：第一列是 X 轴，m00 m10 m20；第二列 Y 轴；第三列 Z 轴。
-        FP r00 = FP.One - (yy2 + zz2);
-        FP r11 = FP.One - (xx2 + zz2);
-        FP r22 = FP.One - (xx2 + yy2);
-        FP r01 = xy + wz;
-        FP r10 = xy - wz;
-        FP r02 = xz - wy;
-        FP r20 = xz + wy;
-        FP r12 = yz + wx;
-        FP r21 = yz - wx;
+        FP r00 = FP.One - two * (yy + zz);
+        FP r01 = two * (xy - wz);
+        FP r02 = two * (xz + wy);
+
+        FP r10 = two * (xy + wz);
+        FP r11 = FP.One - two * (xx + zz);
+        FP r12 = two * (yz - wx);
+
+        FP r20 = two * (xz - wy);
+        FP r21 = two * (yz + wx);
+        FP r22 = FP.One - two * (xx + yy);
 
         FP sx = _localScale.x;
         FP sy = _localScale.y;
         FP sz = _localScale.z;
 
-        // 线性部分 = R * S（按列乘对应轴缩放）
-        _localMatrix.m00 = r00 * sx;
-        _localMatrix.m10 = r10 * sx;
-        _localMatrix.m20 = r20 * sx;
-
-        _localMatrix.m01 = r01 * sy;
-        _localMatrix.m11 = r11 * sy;
-        _localMatrix.m21 = r21 * sy;
-
-        _localMatrix.m02 = r02 * sz;
-        _localMatrix.m12 = r12 * sz;
-        _localMatrix.m22 = r22 * sz;
-
-        // 平移
-        _localMatrix.m03 = _localPosition.x;
-        _localMatrix.m13 = _localPosition.y;
-        _localMatrix.m23 = _localPosition.z;
+        _localMatrix.m00 = r00 * sx; _localMatrix.m01 = r01 * sy; _localMatrix.m02 = r02 * sz; _localMatrix.m03 = _localPosition.x;
+        _localMatrix.m10 = r10 * sx; _localMatrix.m11 = r11 * sy; _localMatrix.m12 = r12 * sz; _localMatrix.m13 = _localPosition.y;
+        _localMatrix.m20 = r20 * sx; _localMatrix.m21 = r21 * sy; _localMatrix.m22 = r22 * sz; _localMatrix.m23 = _localPosition.z;
 
         _localDirty = false;
     }
+    #endregion
 
+    #region UpdateWorld (R_world / W_world / worldScale)
     private void UpdateWorld()
     {
         if (!_worldDirty) return;
 
         UpdateLocal();
 
+        // 提取本地旋转列 (R_local)
+        TSQuaternion q = _localRotation;
+        FP xx = q.x * q.x;
+        FP yy = q.y * q.y;
+        FP zz = q.z * q.z;
+        FP xy = q.x * q.y;
+        FP xz = q.x * q.z;
+        FP yz = q.y * q.z;
+        FP wx = q.w * q.x;
+        FP wy = q.w * q.y;
+        FP wz = q.w * q.z;
+        FP two = (FP)2;
+
+        FP lr00 = FP.One - two * (yy + zz);
+        FP lr10 = two * (xy + wz);
+        FP lr20 = two * (xz - wy);
+
+        FP lr01 = two * (xy - wz);
+        FP lr11 = FP.One - two * (xx + zz);
+        FP lr21 = two * (yz + wx);
+
+        FP lr02 = two * (xz + wy);
+        FP lr12 = two * (yz - wx);
+        FP lr22 = FP.One - two * (xx + yy);
+
+        FP sx = _localScale.x;
+        FP sy = _localScale.y;
+        FP sz = _localScale.z;
+
+        // (R_local * S_local)
+        FP ls00 = lr00 * sx; FP ls01 = lr01 * sy; FP ls02 = lr02 * sz;
+        FP ls10 = lr10 * sx; FP ls11 = lr11 * sy; FP ls12 = lr12 * sz;
+        FP ls20 = lr20 * sx; FP ls21 = lr21 * sy; FP ls22 = lr22 * sz;
+
         if (_parent == null)
         {
             _worldMatrix = _localMatrix;
             _worldPosition = _localPosition;
             _worldRotation = _localRotation;
+
+            // R_world = R_local
+            _rw00 = lr00; _rw01 = lr01; _rw02 = lr02;
+            _rw10 = lr10; _rw11 = lr11; _rw12 = lr12;
+            _rw20 = lr20; _rw21 = lr21; _rw22 = lr22;
+
+            // W_world = R_local * S_local
+            _ww00 = ls00; _ww01 = ls01; _ww02 = ls02;
+            _ww10 = ls10; _ww11 = ls11; _ww12 = ls12;
+            _ww20 = ls20; _ww21 = ls21; _ww22 = ls22;
+
+            // signAccum (仅调试)
+            _signX = sx < 0 ? -1 : 1;
+            _signY = sy < 0 ? -1 : 1;
+            _signZ = sz < 0 ? -1 : 1;
+
+            // worldScale = diag(R_world^T * W_world) = dot(Rw.col(i), Ww.col(i))
+            FP wsx =  _rw00 * _ww00 + _rw10 * _ww10 + _rw20 * _ww20;
+            FP wsy =  _rw01 * _ww01 + _rw11 * _ww11 + _rw21 * _ww21;
+            FP wsz =  _rw02 * _ww02 + _rw12 * _ww12 + _rw22 * _ww22;
+            _worldScale = new TSVector(wsx, wsy, wsz);
         }
         else
         {
             _parent.UpdateWorld();
-            _worldMatrix = _parent._worldMatrix * _localMatrix; // 需要实现矩阵乘（仿射）
-            // world position 来自矩阵
+            _worldMatrix = _parent._worldMatrix * _localMatrix;
             _worldPosition = new TSVector(_worldMatrix.m03, _worldMatrix.m13, _worldMatrix.m23);
             _worldRotation = _parent._worldRotation * _localRotation;
-            // 若需确保单位，可 Normalize
+
+            // R_world = R_parent * R_local
+            FP pr00=_parent._rw00, pr01=_parent._rw01, pr02=_parent._rw02;
+            FP pr10=_parent._rw10, pr11=_parent._rw11, pr12=_parent._rw12;
+            FP pr20=_parent._rw20, pr21=_parent._rw21, pr22=_parent._rw22;
+
+            _rw00 = pr00 * lr00 + pr01 * lr10 + pr02 * lr20;
+            _rw01 = pr00 * lr01 + pr01 * lr11 + pr02 * lr21;
+            _rw02 = pr00 * lr02 + pr01 * lr12 + pr02 * lr22;
+
+            _rw10 = pr10 * lr00 + pr11 * lr10 + pr12 * lr20;
+            _rw11 = pr10 * lr01 + pr11 * lr11 + pr12 * lr21;
+            _rw12 = pr10 * lr02 + pr11 * lr12 + pr12 * lr22;
+
+            _rw20 = pr20 * lr00 + pr21 * lr10 + pr22 * lr20;
+            _rw21 = pr20 * lr01 + pr21 * lr11 + pr22 * lr21;
+            _rw22 = pr20 * lr02 + pr21 * lr12 + pr22 * lr22;
+
+            // W_world = W_parent * (R_local * S_local)
+            FP pw00=_parent._ww00, pw01=_parent._ww01, pw02=_parent._ww02;
+            FP pw10=_parent._ww10, pw11=_parent._ww11, pw12=_parent._ww12;
+            FP pw20=_parent._ww20, pw21=_parent._ww21, pw22=_parent._ww22;
+
+            _ww00 = pw00 * ls00 + pw01 * ls10 + pw02 * ls20;
+            _ww01 = pw00 * ls01 + pw01 * ls11 + pw02 * ls21;
+            _ww02 = pw00 * ls02 + pw01 * ls12 + pw02 * ls22;
+
+            _ww10 = pw10 * ls00 + pw11 * ls10 + pw12 * ls20;
+            _ww11 = pw10 * ls01 + pw11 * ls11 + pw12 * ls21;
+            _ww12 = pw10 * ls02 + pw11 * ls12 + pw12 * ls22;
+
+            _ww20 = pw20 * ls00 + pw21 * ls10 + pw22 * ls20;
+            _ww21 = pw20 * ls01 + pw21 * ls11 + pw22 * ls21;
+            _ww22 = pw20 * ls02 + pw21 * ls12 + pw22 * ls22;
+
+            // signAccum（调试）
+            int lx = sx < 0 ? -1 : 1;
+            int ly = sy < 0 ? -1 : 1;
+            int lz = sz < 0 ? -1 : 1;
+            _signX = _parent._signX * lx;
+            _signY = _parent._signY * ly;
+            _signZ = _parent._signZ * lz;
+
+            // worldScale
+            FP wsx =  _rw00 * _ww00 + _rw10 * _ww10 + _rw20 * _ww20;
+            FP wsy =  _rw01 * _ww01 + _rw11 * _ww11 + _rw21 * _ww21;
+            FP wsz =  _rw02 * _ww02 + _rw12 * _ww12 + _rw22 * _ww22;
+            _worldScale = new TSVector(wsx, wsy, wsz);
         }
 
         _worldDirty = false;
         _worldInvDirty = true;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void UpdateWorldInverse()
     {
         UpdateWorld();
         if (!_worldInvDirty) return;
-        _worldMatrixInv = _worldMatrix.Inverse(); // 需你在 TMatrix3x4 中实现
+        _worldInv = _worldMatrix.Inverse();
         _worldInvDirty = false;
     }
     #endregion
 
-    #region World Mutators (Position / Rotation)
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetWorldPosition(in TSVector wpos)
+    #region Helpers
+    private static TSVector SanitizeScale(TSVector v)
     {
-        if (_parent == null)
-            localPosition = wpos;
-        else
-        {
-            var invParent = _parent.worldMatrixInverse;
-            localPosition = invParent.MultiplyPoint(wpos);
-        }
+        if (FP.Abs(v.x) < MIN_ABS_SCALE) v.x = (v.x >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        if (FP.Abs(v.y) < MIN_ABS_SCALE) v.y = (v.y >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        if (FP.Abs(v.z) < MIN_ABS_SCALE) v.z = (v.z >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        return v;
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetWorldRotation(in TSQuaternion wrot)
+    private static TSVector InitialLocalScaleFromWorld(in TSVector desiredWorldScale, in TSVector parentWorldScale)
     {
-        if (_parent == null)
-            localRotation = wrot;
-        else
-        {
-            _parent.UpdateWorld();
-            // local = parent^-1 * world
-            var invParent = _parent._worldRotation.Inverse(); // 假设有 Inverse()
-            localRotation = invParent * wrot;
-        }
+        FP px = FP.Abs(parentWorldScale.x) < MIN_ABS_SCALE ? MIN_ABS_SCALE : parentWorldScale.x;
+        FP py = FP.Abs(parentWorldScale.y) < MIN_ABS_SCALE ? MIN_ABS_SCALE : parentWorldScale.y;
+        FP pz = FP.Abs(parentWorldScale.z) < MIN_ABS_SCALE ? MIN_ABS_SCALE : parentWorldScale.z;
+        return new TSVector(desiredWorldScale.x / px,
+                            desiredWorldScale.y / py,
+                            desiredWorldScale.z / pz);
     }
     #endregion
 
-    #region Batch Local Set
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetLocalTRS(in TSVector pos, in TSQuaternion rot, in TSVector scale)
-    {
-        bool changed = false;
-        if (_localPosition != pos) { _localPosition = pos; changed = true; }
-        if (_localRotation != rot) { _localRotation = rot; changed = true; }
-
-        var sc = SanitizeScale(scale);
-        if (_localScale != sc) { _localScale = sc; changed = true; }
-
-        if (changed)
-        {
-            _localDirty = true;
-            MarkWorldDirty();
-        }
-    }
-    #endregion
-
-    #region World TRS Accessors
-    public (TSVector position, TSQuaternion rotation, TSVector scaleApprox) GetWorldTRSApprox()
-    {
-        // 仅返回 position & rotation；scaleApprox 临时用 1,1,1（或可做一次分解）
-        UpdateWorld();
-        return (_worldPosition, _worldRotation, TSVector.one);
-    }
-    #endregion
-
-    #region Transform Functions
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    #region API
     public TSVector TransformPoint(in TSVector p) { UpdateWorld(); return _worldMatrix.MultiplyPoint(p); }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public TSVector InverseTransformPoint(in TSVector p) => worldMatrixInverse.MultiplyPoint(p);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public TSVector InverseTransformPoint(in TSVector p) { return worldMatrixInverse.MultiplyPoint(p); }
     public TSVector TransformVector(in TSVector v) { UpdateWorld(); return _worldMatrix.MultiplyVector(v); }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public TSVector InverseTransformVector(in TSVector v) => worldMatrixInverse.MultiplyVector(v);
-
-    // Direction: 只考虑旋转，不考虑缩放
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public TSVector TransformDirection(in TSVector d)
-    {
-        UpdateWorld();
-        return _worldRotation * d; // 假设 quaternion*vector 已实现纯旋转
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public TSVector InverseTransformDirection(in TSVector d)
-    {
-        UpdateWorld();
-        var inv = _worldRotation.Inverse();
-        return inv * d;
-    }
+    public TSVector TransformDirection(in TSVector d) { UpdateWorld(); return _worldRotation * d; }
+    public TSVector InverseTransformDirection(in TSVector d) { UpdateWorld(); var inv = TSQuaternion.Inverse(_worldRotation); return inv * d; }
 
     public void Translate(in TSVector delta, Space space = Space.Self)
     {
-        if (space == Space.World)
-        {
-            SetWorldPosition(worldPosition + delta);
-        }
+        if (space == Space.World) localPosition = worldPosition + delta;
         else
         {
             UpdateWorld();
-            // 取纯旋转基
-            GetRotationAxes(_worldRotation, out TSVector right, out TSVector up, out TSVector fwd);
-            SetWorldPosition(_worldPosition + right * delta.x + up * delta.y + fwd * delta.z);
+            var right = _worldRotation * TSVector.right;
+            var up    = _worldRotation * TSVector.up;
+            var fwd   = _worldRotation * TSVector.forward;
+            localPosition = worldPosition + right * delta.x + up * delta.y + fwd * delta.z;
         }
     }
-
-    public void Rotate(in TSQuaternion deltaRot, Space space = Space.Self)
+    public void Rotate(in TSQuaternion dq, Space space = Space.Self)
     {
-        if (space == Space.Self)
-        {
-            localRotation = _localRotation * deltaRot;
-        }
+        if (space == Space.Self) localRotation = localRotation * dq;
+        else SetWorldRotation(worldRotation * dq);
+    }
+    public void SetWorldPosition(in TSVector wp)
+    {
+        if (_parent == null) localPosition = wp;
         else
         {
-            // world = delta * world
-            SetWorldRotation(deltaRot * worldRotation);
+            var invParent = _parent.worldMatrixInverse;
+            localPosition = invParent.MultiplyPoint(wp);
         }
     }
-
-    public void LookAt(in TSVector worldTarget, in TSVector worldUp)
+    public void SetWorldRotation(in TSQuaternion wr)
     {
-        TSVector dir = worldTarget - worldPosition;
-        if (dir.LengthSquared() < FP.EN7) return;
-
-        var lookRot = Transform3DFixedHelper.LookRotation(dir, worldUp);
-        SetWorldRotation(lookRot);
+        if (_parent == null) localRotation = wr;
+        else
+        {
+            _parent.UpdateWorld();
+            var inv = TSQuaternion.Inverse(_parent._worldRotation);
+            localRotation = inv * wr;
+        }
     }
     #endregion
 
-    #region Recursive Refresh
-    public void RecalculateWorldRecursive()
-    {
-        UpdateWorld();
-        foreach (var c in _children)
-            c.RecalculateWorldRecursive();
-    }
-    #endregion
-
-    #region Utilities
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static TSVector SanitizeScale(TSVector s)
-    {
-        if (FP.Abs(s.x) < MIN_ABS_SCALE) s.x = (s.x >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
-        if (FP.Abs(s.y) < MIN_ABS_SCALE) s.y = (s.y >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
-        if (FP.Abs(s.z) < MIN_ABS_SCALE) s.z = (s.z >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
-        return s;
-    }
-
-    // 从 quaternion 获取基向量（假设 * 运算可旋转向量）
-    private static void GetRotationAxes(in TSQuaternion q, out TSVector right, out TSVector up, out TSVector forward)
-    {
-        right   = q * TSVector.right;
-        up      = q * TSVector.up;
-        forward = q * TSVector.forward;
-    }
-    #endregion
-
-    #region Debug / Interop (可选)
+    #region Debug
     public override string ToString()
     {
-        var w = GetWorldTRSApprox();
-        return $"Local(pos={_localPosition}, rot={_localRotation}, scale={_localScale}) | World(pos={w.position}, rot={w.rotation})";
+        return $"Local(P={_localPosition}, R={_localRotation}, S={_localScale}) | World(P={_worldPosition}, R={_worldRotation}, Scale={_worldScale}, sign=({_signX},{_signY},{_signZ}))";
     }
-
     public Matrix4x4 WorldMatrix4x4
     {
         get
@@ -421,7 +472,6 @@ public class Transform3DFixed
             );
         }
     }
-
     public Matrix4x4 LocalMatrix4x4
     {
         get
@@ -437,80 +487,92 @@ public class Transform3DFixed
     }
     #endregion
 
-    #region Constructors
-    public Transform3DFixed() { }
-    public Transform3DFixed(Transform3DFixed parent, bool keepWorld = true)
+    #region Recursive
+    public void RecalculateWorldRecursive()
     {
-        SetParent(parent, keepWorld);
+        UpdateWorld();
+        foreach (var c in _children)
+            c.RecalculateWorldRecursive();
+    }
+    #endregion
+
+    #region Batch Local
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void SetLocalTRS(in TSVector pos, in TSQuaternion rot, in TSVector scale)
+    {
+        bool changed = false;
+        if (_localPosition != pos) { _localPosition = pos; changed = true; }
+        if (!TSQuaternion.ValueEquals(_localRotation, rot)) { _localRotation = rot; changed = true; }
+        var sc = SanitizeScale(scale);
+        if (_localScale != sc) { _localScale = sc; changed = true; }
+        if (changed) { _localDirty = true; MarkWorldDirty(); }
+    }
+    #endregion
+
+    #region Ctor
+    public Transform3DFixed() { }
+    public Transform3DFixed(Transform3DFixed parent, bool keepWorld = true) { SetParent(parent, keepWorld); }
+    #endregion
+
+    #region Pure RS
+    public static void DecomposePureRS3D(in TMatrix3x4 m,
+                                         out TSVector pos,
+                                         out TSQuaternion rot,
+                                         out TSVector scale)
+    {
+        Transform3DFixedRSHelper.DecomposePureRS(in m, out pos, out rot, out scale);
     }
     #endregion
 }
 
 /// <summary>
-/// 3D 辅助，含 TRS 分解与 LookRotation。根据你的固定点数学库适配。
+/// 3D 纯 RS 分解（假设线性 = R * S）。若含 shear，会把 shear 吸收入旋转/缩放——与 2D 行为一致。
+/// 行列式 < 0 ：翻第一列 + sx 取负。
 /// </summary>
-public static class Transform3DFixedHelper
+public static class Transform3DFixedRSHelper
 {
     private static readonly FP MIN_ABS_SCALE = FP.EN6;
 
-    /// <summary>
-    /// 分解 3x4 仿射矩阵为 pos / rot / scale（无 skew 假设）。
-    /// 若行列式为负，放到一个轴的 scale 上（这里选择 X 轴）。
-    /// </summary>
-    public static void DecomposeTRS(in TMatrix3x4 m, out TSVector pos, out TSQuaternion rot, out TSVector scale)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void DecomposePureRS(in TMatrix3x4 m,
+                                       out TSVector pos,
+                                       out TSQuaternion rot,
+                                       out TSVector scale)
     {
         pos = new TSVector(m.m03, m.m13, m.m23);
 
-        // 线性列向量
-        TSVector col0 = new TSVector(m.m00, m.m10, m.m20);
-        TSVector col1 = new TSVector(m.m01, m.m11, m.m21);
-        TSVector col2 = new TSVector(m.m02, m.m12, m.m22);
+        TSVector c0 = new TSVector(m.m00, m.m10, m.m20);
+        TSVector c1 = new TSVector(m.m01, m.m11, m.m21);
+        TSVector c2 = new TSVector(m.m02, m.m12, m.m22);
 
-        FP sx = col0.Magnitude();
-        FP sy = col1.Magnitude();
-        FP sz = col2.Magnitude();
+        FP sx = c0.magnitude;
+        FP sy = c1.magnitude;
+        FP sz = c2.magnitude;
 
-        if (sx < MIN_ABS_SCALE) sx = (sx >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
-        if (sy < MIN_ABS_SCALE) sy = (sy >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
-        if (sz < MIN_ABS_SCALE) sz = (sz >= 0 ? MIN_ABS_SCALE : -MIN_ABS_SCALE);
+        if (sx < MIN_ABS_SCALE) sx = MIN_ABS_SCALE;
+        if (sy < MIN_ABS_SCALE) sy = MIN_ABS_SCALE;
+        if (sz < MIN_ABS_SCALE) sz = MIN_ABS_SCALE;
 
-        // 归一化形成旋转矩阵列
-        var invSx = FP.One / sx;
-        var invSy = FP.One / sy;
-        var invSz = FP.One / sz;
+        TSVector r0 = c0 / sx;
+        TSVector r1 = c1 / sy;
+        TSVector r2 = c2 / sz;
 
-        TSVector r0 = col0 * invSx;
-        TSVector r1 = col1 * invSy;
-        TSVector r2 = col2 * invSz;
-
-        // 检查是否反射（行列式 < 0）
         FP det = Dot(r0, Cross(r1, r2));
-        if (det < 0)
+        if (det < FP.Zero)
         {
-            // 把反射吸收进 X 轴缩放
             sx = -sx;
-            r0 = r0 * -FP.One;
+            r0 = TSVector.zero-r0;
         }
 
-        // 从正交矩阵 (r0,r1,r2) 构造四元数
         rot = FromRotationColumns(r0, r1, r2);
-
+        rot.Normalize();
         scale = new TSVector(sx, sy, sz);
     }
 
-    public static TSQuaternion LookRotation(in TSVector forward, in TSVector up)
-    {
-        // 构造正交基
-        TSVector f = forward.Normalized();
-        TSVector r = Cross(up, f).Normalized();
-        TSVector u = Cross(f, r);
-
-        return FromRotationColumns(r, u, f);
-    }
-
-    #region Math Helpers (需与你的向量/四元数实现一致)
+    #region Math helpers
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static FP Dot(in TSVector a, in TSVector b) => a.x * b.x + a.y * b.y + a.z * b.z;
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static TSVector Cross(in TSVector a, in TSVector b)
         => new TSVector(
             a.y * b.z - a.z * b.y,
@@ -518,13 +580,8 @@ public static class Transform3DFixedHelper
             a.x * b.y - a.y * b.x
         );
 
-    // 从旋转矩阵列向量生成四元数（列为基向量 x=r0, y=r1, z=r2）
     private static TSQuaternion FromRotationColumns(in TSVector r0, in TSVector r1, in TSVector r2)
     {
-        // 旋转矩阵：
-        // [ r0.x r1.x r2.x ]
-        // [ r0.y r1.y r2.y ]
-        // [ r0.z r1.z r2.z ]
         FP trace = r0.x + r1.y + r2.z;
         TSQuaternion q;
         if (trace > FP.Zero)
@@ -535,7 +592,7 @@ public static class Transform3DFixedHelper
                 (r2.y - r1.z) * invS,
                 (r0.z - r2.x) * invS,
                 (r1.x - r0.y) * invS,
-                s * FP._0_25 // (1/4)*s
+                s * (FP)0.25
             );
         }
         else if (r0.x > r1.y && r0.x > r2.z)
@@ -543,7 +600,7 @@ public static class Transform3DFixedHelper
             FP s = FP.Sqrt(FP.One + r0.x - r1.y - r2.z) * 2;
             FP invS = FP.One / s;
             q = new TSQuaternion(
-                s * FP._0_25,
+                s * (FP)0.25,
                 (r0.y + r1.x) * invS,
                 (r0.z + r2.x) * invS,
                 (r2.y - r1.z) * invS
@@ -555,7 +612,7 @@ public static class Transform3DFixedHelper
             FP invS = FP.One / s;
             q = new TSQuaternion(
                 (r0.y + r1.x) * invS,
-                s * FP._0_25,
+                s * (FP)0.25,
                 (r1.z + r2.y) * invS,
                 (r0.z - r2.x) * invS
             );
@@ -567,14 +624,17 @@ public static class Transform3DFixedHelper
             q = new TSQuaternion(
                 (r0.z + r2.x) * invS,
                 (r1.z + r2.y) * invS,
-                s * FP._0_25,
+                s * (FP)0.25,
                 (r1.x - r0.y) * invS
             );
         }
-        // 归一化（根据你的 TSQuaternion 是否需要）
-        // q = q.Normalized();
+        q.Normalize();
         return q;
     }
     #endregion
 }
-#endif
+
+public static class Transform3DFixedHelper
+{
+    // 如需再加其它工具函数，可放这里
+}
