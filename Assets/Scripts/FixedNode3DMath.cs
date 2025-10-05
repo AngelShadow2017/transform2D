@@ -258,7 +258,7 @@ namespace FixedNode3DInternal
 
         #region Quaternion -> Euler (三个顺序)
 
-        [BurstDiscard,/*BurstCompile,*/ MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [BurstCompile, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void QuaternionToEuler_YXZ(in TSQuaternion q, out TSVector euler)
         {
             // 构造 3x3
@@ -294,7 +294,7 @@ namespace FixedNode3DInternal
             euler.x = x; euler.y = y; euler.z = z;
         }
 
-        [BurstDiscard,/*BurstCompile,*/ MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [BurstCompile, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void QuaternionToEuler_XYZ(in TSQuaternion q, out TSVector euler)
         {
             FP two = (FP)2;
@@ -324,7 +324,7 @@ namespace FixedNode3DInternal
             euler.x = x; euler.y = y; euler.z = z;
         }
 
-        [BurstDiscard,/*BurstCompile,*/ MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [BurstCompile, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void QuaternionToEuler_UnityZXY(in TSQuaternion q, out TSVector euler)
         {
             EpsilonSmallFunc(out FP EpsilonSmall);

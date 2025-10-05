@@ -362,7 +362,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c090ca04a5524f02a531d1387b83c538, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  nodeCount: 64
+  nodeCount: 180
   randomTreeInitial: 1
   initialReparentBias: 0.6
   posMin: {x: -5, y: -3, z: -5}
@@ -386,7 +386,7 @@ MonoBehaviour:
   rotEpsDeg: 0.2
   scaleEps: 0.1
   shearDotEps: 0.001
-  enableReparentTests: 1
+  enableReparentTests: 0
   reparentOpsPerIteration: 6
   reparentPosEps: 0.2
   reparentRotEpsDeg: 0.1
