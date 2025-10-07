@@ -184,14 +184,15 @@ namespace FixedNode3DInternal
 
         #endregion
 
-        #region Euler <-> Quaternion (支持 YXZ / XYZ / UnityZXY)
+        #region Euler <-> Quaternion (支持 YXZ / XYZ / ZXY)
 
         // 注意：AngleAxis 里原本把角度乘 FP.Deg2Rad；这里直接使用弧度输入，不再转度
         // 传入的 eulerRad 即为弧度向量
         [BurstCompile, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void EulerToQuaternion_YXZ(in TSVector eulerRad, out TSQuaternion q)
         {
-            // Y * X * Z intrinsic
+            // Intrinsic Y -> X -> Z (apply about local Y, then new local X, then new local Z)
+            // Implemented as q = qy * qx * qz under Hamilton product where (q2*q1) applies q1 then q2 to a vector via v' = q v q*.
             QuaternionFromAxisAngle((FP)0, (FP)1, (FP)0, eulerRad.y, out TSQuaternion qy);
             QuaternionFromAxisAngle((FP)1, (FP)0, (FP)0, eulerRad.x, out TSQuaternion qx);
             QuaternionFromAxisAngle((FP)0, (FP)0, (FP)1, eulerRad.z, out TSQuaternion qz);
@@ -261,7 +262,7 @@ namespace FixedNode3DInternal
         [BurstCompile, MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void QuaternionToEuler_YXZ(in TSQuaternion q, out TSVector euler)
         {
-            // 构造 3x3
+            // Build standard rotation matrix from quaternion
             FP two = (FP)2;
             FP xx = q.x * q.x;
             FP yy = q.y * q.y;
@@ -283,14 +284,36 @@ namespace FixedNode3DInternal
             FP r21 = two * (yz + wx);
             FP r22 = (FP)1 - two * (xx + yy);
 
-            // clamp r21
-            FP clamp = r21;
-            if (clamp > (FP)1) clamp = (FP)1;
-            if (clamp < (FP)0 - (FP)1) clamp = (FP)0 - (FP)1;
+            // For intrinsic Y-X-Z: relations (derived):
+            // r12 = -sin(x)
+            // r02 = sin(y) * cos(x)
+            // r22 = cos(y) * cos(x)
+            // r10 = cos(x) * sin(z)
+            // r11 = cos(x) * cos(z)
+            // Extract x first
+            FP sinx = (FP)0 - r12; // sinx = -r12
+            if (sinx > (FP)1) sinx = (FP)1; else if (sinx < (FP)0 - (FP)1) sinx = (FP)0 - (FP)1;
+            FP x = FP.Asin(sinx);
+            FP cx = FP.Cos(x);
 
-            FP x = (FP)0 - FP.Asin(clamp);
-            FP y = FP.Atan2(r20, r22);
-            FP z = FP.Atan2(r01, r11);
+            FP y, z;
+            // Handle potential gimbal lock when cos(x) ~ 0
+            EpsilonSmallFunc(out FP eps);
+            if (FP.Abs(cx) > eps)
+            {
+                y = FP.Atan2(r02, r22);
+                z = FP.Atan2(r10, r11);
+            }
+            else
+            {
+                // Gimbal lock: x ~ ±90°. Set z = 0, resolve y from remaining terms.
+                z = (FP)0;
+                // When cx -> 0, r00 ≈ cY*cZ + sY*sign(x)*sZ and r01 ≈ -cY*sZ + sY*sign(x)*cZ.
+                // With z forced 0 => cZ=1, sZ=0 => r00 ≈ cY, r01 ≈ sY*sign(x). Use atan2(sY_sign, cY).
+                // sign(x) = sin(x) / |sin(x)| (already sinx)
+                FP signx = sinx >= (FP)0 ? (FP)1 : (FP)0 - (FP)1;
+                y = FP.Atan2(r01 * signx, r00);
+            }
             euler.x = x; euler.y = y; euler.z = z;
         }
 
@@ -314,12 +337,10 @@ namespace FixedNode3DInternal
             FP r12 = two * (yz - wx);
             FP r22 = (FP)1 - two * (xx + yy);
 
-            FP syVal = r02;
-            if (syVal > (FP)1) syVal = (FP)1;
-            if (syVal < (FP)0 - (FP)1) syVal = (FP)0 - (FP)1;
-
+            // For intrinsic X-Y-Z: r02 = sin(y), r12 = sin(x)*cos(y), r22 = cos(x)*cos(y)
+            FP syVal = r02; if (syVal > (FP)1) syVal = (FP)1; else if (syVal < (FP)0 - (FP)1) syVal = (FP)0 - (FP)1;
             FP y = FP.Asin(syVal);
-            FP x = FP.Atan2((FP)0 - r12, r22);
+            FP x = FP.Atan2(r12, r22); // removed erroneous negative sign
             FP z = FP.Atan2((FP)0 - r01, r00);
             euler.x = x; euler.y = y; euler.z = z;
         }
@@ -348,23 +369,19 @@ namespace FixedNode3DInternal
             FP r21 = two * (yz + wx);
             FP r22 = (FP)1 - two * (xx + yy);
 
-            // ZXY
-            FP sx = r21;
-            if (sx > (FP)1) sx = (FP)1;
-            if (sx < (FP)0 - (FP)1) sx = (FP)0 - (FP)1;
-
+            // Intrinsic Z-X-Y (Unity ZXY) extraction:
+            FP sx = r21; if (sx > (FP)1) sx = (FP)1; else if (sx < (FP)0 - (FP)1) sx = (FP)0 - (FP)1;
             FP x = FP.Asin(sx);
             FP cx = FP.Cos(x);
-            FP eps = EpsilonSmall;
             FP y, z;
-            if (FP.Abs(cx) > eps)
+            if (FP.Abs(cx) > EpsilonSmall)
             {
                 y = FP.Atan2((FP)0 - r20, r22);
-                z = FP.Atan2(r01, r11);
+                z = FP.Atan2((FP)0 - r01, r11); // corrected sign for z
             }
             else
             {
-                z = (FP)0;
+                z = (FP)0; // gimbal lock fallback
                 y = FP.Atan2(r10, r00);
             }
             euler.x = x; euler.y = y; euler.z = z;
@@ -479,3 +496,4 @@ namespace FixedNode3DInternal
         #endregion
     }
 }
+

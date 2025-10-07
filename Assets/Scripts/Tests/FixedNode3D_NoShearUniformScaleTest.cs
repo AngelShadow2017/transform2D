@@ -80,8 +80,8 @@ public class FixedNode3D_NoShearUniformScale_ReparentTest : MonoBehaviour
     public bool logFirstReparentMismatch = true;
 
     [Header("FixedNode3D Rotation Order Alignment")]
-    [Tooltip("(已确认排除) 如果需要强制指定顺序可打开。用户实测 Unity 此场景等价为 YXZ，我们不再将顺序差异视为主要误差来源。开启仅用于额外对比。")] public bool forceExplicitOrder = false;
-    public FixedNode3D.RotationOrder forcedOrder = FixedNode3D.RotationOrder.YXZ;
+    [Tooltip("Match Unity's Quaternion.Euler order (Z * X * Y) to avoid large rotation mismatches. If false uses FixedNode3D default (YXZ). Advance tests should keep this true.")]
+    public bool useUnityZXYOrder = false;
 
     private struct NodePair
     {
@@ -167,7 +167,7 @@ public class FixedNode3D_NoShearUniformScale_ReparentTest : MonoBehaviour
         nodes.Clear();
         var rootT = transform;
         var rootF = new FixedNode3D(null, keepWorld: true);
-        if (forceExplicitOrder) rootF.rotationOrder = forcedOrder; // 仅在用户显式需要时设置
+        if (useUnityZXYOrder) rootF.rotationOrder = FixedNode3D.RotationOrder.ZXY; // ensure order before any euler usage
 
         nodes.Add(new NodePair
         {
@@ -193,7 +193,7 @@ public class FixedNode3D_NoShearUniformScale_ReparentTest : MonoBehaviour
             go.transform.SetParent(parentUnity, worldPositionStays: true);
 
             var fn = new FixedNode3D(parentFixed, keepWorld: true);
-            if (forceExplicitOrder) fn.rotationOrder = forcedOrder;
+            if (useUnityZXYOrder) fn.rotationOrder = FixedNode3D.RotationOrder.ZXY;
 
             nodes.Add(new NodePair
             {
@@ -547,14 +547,14 @@ public class FixedNode3D_NoShearUniformScale_ReparentTest : MonoBehaviour
     #region Helpers
     private void ApplyUniformLocalTRS(FixedNode3D node, Vector3 lp, Vector3 leDeg, float uniformScale)
     {
-        if (forceExplicitOrder && node.rotationOrder != forcedOrder)
-            node.rotationOrder = forcedOrder; // 防御性：动态节点/重设父后保持一致
-        // 顺序差异已被排除为主要误差来源；这里直接使用当前 rotationOrder 解释欧拉
+        if (useUnityZXYOrder && node.rotationOrder != FixedNode3D.RotationOrder.ZXY)
+            node.rotationOrder = FixedNode3D.RotationOrder.ZXY; // guard for dynamically created / reparented nodes
+        // NOTE: Unity's Quaternion.Euler(x,y,z) uses ZXY intrinsic (checked via docs & reproduced), so we feed identical angles in the matching order.
         var scale = new TSVector((FP)uniformScale, (FP)uniformScale, (FP)uniformScale);
         var pos   = new TSVector((FP)lp.x, (FP)lp.y, (FP)lp.z);
         Vector3 leRad = leDeg * Mathf.Deg2Rad;
         var eulerRad = new TSVector((FP)leRad.x, (FP)leRad.y, (FP)leRad.z);
-        node.localEuler = eulerRad; // interpreted under current rotationOrder
+        node.localEuler = eulerRad; // interpreted under rotationOrder
         node.localScale = scale;
         node.localPosition = pos;
     }

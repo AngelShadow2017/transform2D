@@ -515,7 +515,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &942405762
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -528,7 +528,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c090ca04a5524f02a531d1387b83c538, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  nodeCount: 12
+  nodeCount: 25
   randomTreeInitial: 1
   initialReparentBias: 0.6
   posMin: {x: -5, y: -3, z: -5}
@@ -566,8 +566,7 @@ MonoBehaviour:
   verbosePerIteration: 0
   summaryAtEnd: 1
   logFirstReparentMismatch: 0
-  forceExplicitOrder: 0
-  forcedOrder: 0
+  useUnityZXYOrder: 0
 --- !u!4 &942405763
 Transform:
   m_ObjectHideFlags: 0

@@ -38,7 +38,7 @@
 // -------------------------------------------------------------------------
 // 追加说明（新增 Unity 兼容旋转顺序支持 + Shear 保留策略补充）:
 // - Unity 内部的 Transform.eulerAngles 使用内在顺序 ZXY（intrinsic Z->X->Y）。
-// - 增加 RotationOrder.UnityZXY。
+// - 增加 RotationOrder.ZXY。
 // - Shear 支持：现在 localTransform 线性部分可包含 shear（与 Godot Node3D Basis 一样）。
 //   * 当通过 reparent / SetWorldTRS / SetLocalMatrix 写入时，不主动去除 shear。
 //   * 当通过设置 rotation/scale/quaternion 重建时：
@@ -65,7 +65,7 @@ public class FixedNode3D
     {
         YXZ = 0,
         XYZ = 1,
-        UnityZXY = 2
+        ZXY = 2
     }
     #endregion
 
@@ -677,7 +677,7 @@ public class FixedNode3D
         switch (order)
         {
             case RotationOrder.YXZ:      res = qy * qx * qz; break;
-            case RotationOrder.UnityZXY: res = qz * qx * qy; break;
+            case RotationOrder.ZXY: res = qz * qx * qy; break;
             case RotationOrder.XYZ:
             default: res = qx * qy * qz; break;
         }
@@ -712,7 +712,7 @@ public class FixedNode3D
                 FP z = FP.Atan2(r01, r11);
                 return new TSVector(x, y, z);
             }
-            case RotationOrder.UnityZXY:
+            case RotationOrder.ZXY:
             {
                 FP sx = r21; if (sx > FP.One) sx = FP.One; if (sx < -FP.One) sx = -FP.One;
                 FP x = FP.Asin(sx);

@@ -35,7 +35,7 @@ public class FixedNode3D
     {
         YXZ = 0,
         XYZ = 1,
-        UnityZXY = 2
+        ZXY = 2
     }
     #endregion
 
@@ -703,7 +703,7 @@ public class FixedNode3D
             case RotationOrder.YXZ:
                 FixedNode3DMath.EulerToQuaternion_YXZ(eulerRad, out TSQuaternion qyxz);
                 return qyxz;
-            case RotationOrder.UnityZXY:
+            case RotationOrder.ZXY:
                 FixedNode3DMath.EulerToQuaternion_UnityZXY(eulerRad, out TSQuaternion quzxy);
                 return quzxy;
             case RotationOrder.XYZ:
@@ -720,7 +720,7 @@ public class FixedNode3D
             case RotationOrder.YXZ:
                 FixedNode3DMath.QuaternionToEuler_YXZ(q, out TSVector eYXZ);
                 return eYXZ;
-            case RotationOrder.UnityZXY:
+            case RotationOrder.ZXY:
                 FixedNode3DMath.QuaternionToEuler_UnityZXY(q, out TSVector eZXY);
                 return eZXY;
             case RotationOrder.XYZ:

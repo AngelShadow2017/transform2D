@@ -37,7 +37,7 @@
 // -------------------------------------------------------------------------
 // 追加说明（新增 Unity 兼容旋转顺序支持）:
 // - Unity 内部的 Transform.eulerAngles 使用内在顺序 ZXY（相当于 intrinsic Z→X→Y）。
-// - 为了兼容，新增 RotationOrder.UnityZXY，并在 EulerToQuaternion / QuaternionToEuler 中加入分支。
+// - 为了兼容，新增 RotationOrder.ZXY，并在 EulerToQuaternion / QuaternionToEuler 中加入分支。
 // - 保留本文件第一版的所有原始注释，不删除、不改动，只增加必要扩展注释与代码。
 // -------------------------------------------------------------------------
 
@@ -57,12 +57,12 @@ public class FixedNode3D
 
     #region Rotation Order
     // 仅实现 Godot 默认 YXZ，与常用 XYZ。可自行扩展 (XZY,YZX,ZXY,ZYX)。
-    // 扩展：新增 UnityZXY = Unity transform.eulerAngles 使用的内在顺序 Z→X→Y。
+    // 扩展：新增 ZXY = Unity transform.eulerAngles 使用的内在顺序 Z→X→Y。
     public enum RotationOrder : byte
     {
         YXZ = 0,
         XYZ = 1,
-        UnityZXY = 2 // 新增：Unity 内部 eulerAngles 顺序
+        ZXY = 2 // 新增：Unity 内部 eulerAngles 顺序
     }
     #endregion
 
@@ -680,7 +680,7 @@ public class FixedNode3D
             case RotationOrder.YXZ:      // Godot 默认：Ry * Rx * Rz
                 res = qy * qx * qz;
                 break;
-            case RotationOrder.UnityZXY: // Unity: Rz * Rx * Ry
+            case RotationOrder.ZXY: // Unity: Rz * Rx * Ry
                 res = qz * qx * qy;
                 break;
             case RotationOrder.XYZ:
@@ -696,7 +696,7 @@ public class FixedNode3D
     private static TSVector QuaternionToEuler(TSQuaternion q, RotationOrder order)
     {
         // 简化方案：将 quaternion -> rotation matrix -> 再用特定顺序的反解。
-        // 这里只实现 YXZ / XYZ / UnityZXY。
+        // 这里只实现 YXZ / XYZ / ZXY。
 
         // 生成旋转矩阵（无缩放）
         FP xx = q.x * q.x;
@@ -734,7 +734,7 @@ public class FixedNode3D
                 FP z = FP.Atan2(r01, r11);
                 return new TSVector(x, y, z);
             }
-            case RotationOrder.UnityZXY:
+            case RotationOrder.ZXY:
             {
                 // 内在顺序 Z -> X -> Y (R = Rz * Rx * Ry)
                 // 推导关键：中间轴 X，出现 gimbal 时需要 fallback

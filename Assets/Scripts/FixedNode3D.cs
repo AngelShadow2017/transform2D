@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Core.TrueSync;
 using FixedNode3DInternal;
+using UnityEngine;
 
 /*
  * FixedNode3D (Pre-FastPath Snapshot, modified to use ThreadStatic stack)
