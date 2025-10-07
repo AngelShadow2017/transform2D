@@ -184,7 +184,7 @@ namespace Core.TrueSync
             return Euler(eulerAngles.x, eulerAngles.y, eulerAngles.z);
         }
 
-        public static TSQuaternion AngleAxis(FP angle, TSVector axis) {
+        /*public static TSQuaternion AngleAxis(FP angle, TSVector axis) {
             axis = axis * FP.Deg2Rad;
             axis.Normalize();
 
@@ -199,8 +199,36 @@ namespace Core.TrueSync
             rotation.w = FP.Cos(halfAngle);
 
             return rotation;
+        }*/
+        public static TSQuaternion AngleAxis(FP angle, TSVector axis) {
+            axis.Normalize();
+            FP rad = angle * FP.Deg2Rad;
+            FP half = rad * FP.Half;
+            TSQuaternion rotation;
+            // 小角度（<0.5°，约 0.0087266 rad）使用泰勒展开，减少 Sin/Cos 查表量化偏差
+            if (FP.Abs(rad) < (FP)0.00872664625997f) // 0.5° in rad
+            {
+                FP x = half;           // half-angle
+                FP x2 = x * x;         // x^2
+                // sin(x) ≈ x - x^3/6;  cos(x) ≈ 1 - x^2/2  （对 0.5° 误差远小于原 LUT 量化）
+                FP sinHalf = x - (x * x2) / (FP)6;      // x - x^3/6
+                FP cosHalf = FP.One - x2 / (FP)2;       // 1 - x^2/2
+                rotation.x = axis.x * sinHalf;
+                rotation.y = axis.y * sinHalf;
+                rotation.z = axis.z * sinHalf;
+                rotation.w = cosHalf;
+                rotation.Normalize();
+                return rotation;
+            }
+            FP sinH = FP.FastSin(half);
+            FP cosH = FP.FastCos(half);
+            rotation.x = axis.x * sinH;
+            rotation.y = axis.y * sinH;
+            rotation.z = axis.z * sinH;
+            rotation.w = cosH;
+            rotation.Normalize();
+            return rotation;
         }
-
         public static void CreateFromYawPitchRoll(FP yaw, FP pitch, FP roll, out TSQuaternion result)
         {
             FP num9 = roll * FP.Half;

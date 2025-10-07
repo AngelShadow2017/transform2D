@@ -25,7 +25,8 @@ public class FixedNode3D
     #endregion
 
     #region Rotation Order
-    public enum RotationOrder : byte { YXZ = 0, XYZ = 1, UnityZXY = 2 }
+    //测试unity实际上使用的是YXZ顺序
+    public enum RotationOrder : byte { YXZ = 0, XYZ = 1, ZXY = 2 }
     #endregion
 
     #region Hierarchy
@@ -86,8 +87,11 @@ public class FixedNode3D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void UpdateWorldRotScaleCacheIfNeeded()
     {
-        if (_cachedWorldRSVersion == _worldVersion) return;
+        // 重要修复：先确保全局矩阵依据本地脏位刷新，再判断缓存版本。
+        // 之前的实现先用版本号短路，导致 localRotation 改变后 worldVersion 尚未递增，
+        // _cachedWorldRSVersion == _worldVersion 直接返回，worldRotation 停留在第一次值。
         UpdateGlobalTransformIfNeeded();
+        if (_cachedWorldRSVersion == _worldVersion) return;
         FixedNode3DMath.ExtractScale(_globalTransform, out FP sx, out FP sy, out FP sz);
         _cachedWorldScale = new TSVector(sx, sy, sz);
         FixedNode3DMath.ExtractRotationColumnsNormalized(
@@ -152,7 +156,14 @@ public class FixedNode3D
     public TSQuaternion localRotation
     {
         get { UpdateLocalEulerScaleIfNeeded(); return _localRotationQuat; }
-        set { if (!TSQuaternion.ValueEquals(_localRotationQuat, value)) { _localRotationQuat = value; _localRotationQuat.Normalize(); SetDirty(DIRTY_LOCAL_TRANSFORM); } }
+        set {
+            if (!TSQuaternion.ValueEquals(_localRotationQuat, value)) {
+                _localRotationQuat = value; _localRotationQuat.Normalize();
+                // 同步欧拉缓存，避免后续基于 localEuler 的增量使用陈旧基线
+                _eulerRotation = QuaternionToEuler(_localRotationQuat, _rotationOrder);
+                SetDirty(DIRTY_LOCAL_TRANSFORM);
+            }
+        }
     }
     public TSVector localScale
     {
@@ -386,7 +397,7 @@ public class FixedNode3D
         switch (order)
         {
             case RotationOrder.YXZ: FixedNode3DMath.EulerToQuaternion_YXZ(eulerRad, out TSQuaternion qyxz); return qyxz;
-            case RotationOrder.UnityZXY: FixedNode3DMath.EulerToQuaternion_UnityZXY(eulerRad, out TSQuaternion quzxy); return quzxy;
+            case RotationOrder.ZXY: FixedNode3DMath.EulerToQuaternion_UnityZXY(eulerRad, out TSQuaternion quzxy); return quzxy;
             case RotationOrder.XYZ:
             default: FixedNode3DMath.EulerToQuaternion_XYZ(eulerRad, out TSQuaternion qxyz); return qxyz;
         }
@@ -396,7 +407,7 @@ public class FixedNode3D
         switch (order)
         {
             case RotationOrder.YXZ: FixedNode3DMath.QuaternionToEuler_YXZ(q, out TSVector eYXZ); return eYXZ;
-            case RotationOrder.UnityZXY: FixedNode3DMath.QuaternionToEuler_UnityZXY(q, out TSVector eZXY); return eZXY;
+            case RotationOrder.ZXY: FixedNode3DMath.QuaternionToEuler_UnityZXY(q, out TSVector eZXY); return eZXY;
             case RotationOrder.XYZ:
             default: FixedNode3DMath.QuaternionToEuler_XYZ(q, out TSVector eXYZ); return eXYZ;
         }
