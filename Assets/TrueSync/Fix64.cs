@@ -603,7 +603,7 @@ namespace Core.TrueSync {
         /// Returns the arctan of of the specified number, calculated using Euler series
         /// This function has at least 7 decimals of accuracy.
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static FP Atan(FP z)
         {
             if (z.RawValue == 0) return Zero;
@@ -656,7 +656,8 @@ namespace Core.TrueSync {
                 result = -result;
             }
             return result;
-        }
+        }*/
+        /*
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static FP Atan2(FP y, FP x) {
             var yl = y._serializedValue;
@@ -694,8 +695,8 @@ namespace Core.TrueSync {
                 }
             }
             return atan;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        }*/
+        /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static FP Asin(FP value) {
             return FastSub(PiOver2, Acos(value));
         }
@@ -716,7 +717,40 @@ namespace Core.TrueSync {
 
             var result = Atan(Sqrt(One - x * x) / x);
             return x.RawValue < 0 ? result + Pi : result;
+        }*/
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static FP Atan(in FP value)
+        {
+            FP r;
+            r._serializedValue = MathBurstedFix.AtanRaw(value._serializedValue);
+            return r;
         }
+        
+        // （可选）FP 包装：若需要对外公开快速近似版本
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static FP Atan2(in FP y, in FP x)
+        {
+            FP r;
+            r._serializedValue = MathBurstedFix.Atan2RawFast(y._serializedValue, x._serializedValue);
+            return r;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static FP Asin(in FP value)
+        {
+            FP r;
+            r._serializedValue = MathBurstedFix.AsinRaw(value._serializedValue);
+            return r;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static FP Acos(in FP x)
+        {
+            FP r;
+            r._serializedValue = MathBurstedFix.AcosRaw(x._serializedValue);
+            return r;
+        }
+        
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static implicit operator FP(long value) {
             FP result;

@@ -340,4 +340,249 @@ namespace Core.TrueSync
             return res;
         }
     }
+    //三角函数部分
+    public partial struct MathBurstedFix
+    {
+        [BurstCompile(DisableDirectCall = disable, OptimizeFor = OptimizeFor.Performance)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static long AtanRaw(in long zRaw)
+        {
+            // 0 直接返回
+            if (zRaw == 0) return 0;
+        
+            // 取符号（不能直接写负数字面量，用 0 - v）
+            bool neg = zRaw < 0;
+            long x = neg ? (0 - zRaw) : zRaw;
+        
+            // invert：x>1 时使用 atan(x)=PI/2 - atan(1/x)
+            bool invert = x > ONE;
+            if (invert)
+            {
+                x = Division(ONE, x);
+            }
+        
+            // 以下复刻 FP.Atan 的级数形式（与原 FP.Atan 行为一致）
+            // 常量 2,3
+            long TWO = ONE << 1;                // 2.0
+            long THREE = (3L << FRACTIONAL_PLACES); // 3.0
+        
+            long result = ONE;
+            long term = ONE;
+        
+            long zSq = Multiply(x, x);          // x^2
+            long zSq2 = zSq << 1;               // 2 * x^2
+            long zSqPlusOne = zSq + ONE;        // x^2 + 1
+            long zSq12 = zSqPlusOne << 1;       // 2*(x^2+1)
+            long dividend = zSq2;
+            long divisor = Multiply(zSqPlusOne, THREE);
+        
+            for (int i = 2; i < 30; i++)
+            {
+                // term *= dividend / divisor
+                long frac = Division(dividend, divisor);
+                term = Multiply(term, frac);
+                result += term;
+        
+                dividend += zSq2;
+                divisor += zSq12;
+        
+                if (term == 0) break;
+            }
+        
+            // result = result * x / (x^2 + 1)
+            result = Division(Multiply(result, x), zSqPlusOne);
+        
+            if (invert)
+            {
+                result = PI_OVER_2 - result;
+            }
+        
+            if (neg)
+            {
+                result = 0 - result;
+            }
+        
+            return result;
+        }
+        [BurstCompile(DisableDirectCall = disable, OptimizeFor = OptimizeFor.Performance)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static long Atan2Raw(in long yRaw, in long xRaw)
+        {
+            // (0,0) -> 0
+            if (xRaw == 0)
+            {
+                if (yRaw > 0) return PI_OVER_2;
+                if (yRaw < 0) return (0 - PI_OVER_2);
+                return 0;
+            }
+            if (yRaw == 0)
+            {
+                return xRaw >= 0 ? 0 : PI;
+            }
+
+            // 先算 atan(y/x)
+            long ratio = Division(yRaw, xRaw);
+            long angle = AtanRaw(ratio); // 范围 (-PI/2, PI/2)
+
+            if (xRaw < 0)
+            {
+                if (yRaw >= 0)
+                {
+                    angle += PI;
+                }
+                else
+                {
+                    angle -= PI;
+                }
+            }
+
+            long NEG_PI = (0 - PI);
+            if (angle > PI)
+            {
+                angle -= PI_TIMES_2;
+            }
+            else if (angle < NEG_PI)
+            {
+                angle += PI_TIMES_2;
+            }
+            return angle;
+        }
+        [BurstCompile(DisableDirectCall = disable, OptimizeFor = OptimizeFor.Performance)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+
+        public static long Atan2RawFast(in long yRaw, in long xRaw)
+        {
+            // 特殊点与轴处理
+            if (xRaw == 0)
+            {
+                if (yRaw > 0) return PI_OVER_2;
+                if (yRaw < 0) return (0 - PI_OVER_2);
+                return 0; // (0,0)
+            }
+            if (yRaw == 0)
+            {
+                return xRaw >= 0 ? 0 : PI;
+            }
+
+            // z = y / x
+            long z = Division(yRaw, xRaw); // 定点 (Q32)
+
+            // sm = EN2 * 28  (EN2 原始常量  = ONE / 100 = 42949673)
+            // 28 的定点表示 = 28 << FRACTIONAL_PLACES
+            long twentyEight = (28L << FRACTIONAL_PLACES);
+            long EN2_RAW = 42949673;                  // 与 FP.EN2_LONGVAL 保持一致
+            long sm = Multiply(EN2_RAW, twentyEight); // ≈ 0.28 (Q32)
+
+            // 预计算 z^2 与 sm*z*z
+            long zSq = Multiply(z, z);
+            long sm_z_z = Multiply(sm, zSq);
+
+            // 溢出检测：与原实现一致逻辑 (One + sm*z*z == MaxValue)
+            long overflowCheck = ONE + sm_z_z;
+            if (overflowCheck == MaxValue)
+            {
+                return yRaw < 0 ? (0 - PI_OVER_2) : PI_OVER_2;
+            }
+
+            long absZ = z < 0 ? (0 - z) : z;
+            long atan;
+
+            if (absZ < ONE)
+            {
+                // atan ≈ z / (1 + sm*z*z)
+                long denom = ONE + sm_z_z;
+                atan = Division(z, denom);
+
+                if (xRaw < 0)
+                {
+                    if (yRaw < 0) atan -= PI;
+                    else atan += PI;
+                }
+            }
+            else
+            {
+                // atan ≈ PI/2 - z / (z*z + sm)
+                long denom = zSq + sm;
+                long frac = Division(z, denom);
+                atan = PI_OVER_2 - frac;
+
+                if (yRaw < 0)
+                {
+                    atan -= PI;
+                }
+            }
+
+            // 归一化到 [-PI, PI]
+            /*long NEG_PI = (0 - PI);
+            if (atan > PI) atan -= PI_TIMES_2;
+            else if (atan < NEG_PI) atan += PI_TIMES_2;
+            */
+            return atan;
+        }
+
+
+        [BurstCompile(DisableDirectCall = disable, OptimizeFor = OptimizeFor.Performance)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static long AcosRaw(in long xRaw)
+        {
+            // 域裁剪到 [-1,1]
+            long x = xRaw;
+            long NEG_ONE = (0 - ONE);
+            if (x > ONE) x = ONE;
+            if (x < NEG_ONE) x = NEG_ONE;
+        
+            if (x == 0) return PI_OVER_2;
+        
+            // t = 1 - x*x
+            long t = ONE - Multiply(x, x);
+            if (t < 0) t = 0;
+        
+            // 开方（沿用现有 Sqrt；其缩放与全局 FP.Sqrt 保持一致，保持行为一致）
+            long sqrtVal = (long)Sqrt(ref t); // 注意：沿用现有实现的缩放特性
+        
+            // ratio = sqrt(1 - x^2) / x
+            long ratio = Division(sqrtVal, x);
+        
+            long atanPart = AtanRaw(ratio);
+        
+            // x < 0 ? atan + PI : atan
+            if (x < 0)
+            {
+                atanPart += PI;
+            }
+            return atanPart;
+        }
+        
+        [BurstCompile(DisableDirectCall = disable)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static long AsinRaw(in long xRaw)
+        {
+            // asin(x) = PI/2 - acos(x)
+            long a = AcosRaw(xRaw);
+            return PI_OVER_2 - a;
+        }
+        
+        
+        // =============================
+        // 文件: Assets/TrueSync/Fix64.cs  修改 Asin / Acos 调用 Raw 版本
+        // 用原有 FP 外壳，保持对外接口不变
+        // =============================
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static FP Asin(FP value)
+        {
+            FP r;
+            r._serializedValue = MathBurstedFix.AsinRaw(value._serializedValue);
+            return r;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static FP Acos(FP x)
+        {
+            FP r;
+            r._serializedValue = MathBurstedFix.AcosRaw(x._serializedValue);
+            return r;
+        }
+        
+    }
 }
