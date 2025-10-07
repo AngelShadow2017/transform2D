@@ -5,7 +5,33 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5d9c2c04-3103-4b1e-88cf-c3682a788642" name="更改" comment="">
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D_Baseline.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D_Baseline.cs.meta" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D_bc2.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D_bc2.cs.meta" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Tests/FixedNode3D_PerfRandom.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Tests/FixedNode3D_PerfRandom.cs.meta" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Tests/FixedNode3D_PerfTest.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Scripts/Tests/FixedNode3D_PerfTest.cs.meta" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.transform2D/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.transform2D/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/New Scene 1.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/New Scene 1.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TrueSync/Fix64.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TrueSync/Fix64.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TrueSync/MathBurstedFix.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TrueSync/MathBurstedFix.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.22b138681e.0.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.22b138681e.1.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.22b138681e.2.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.22b138681e.3.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.22b138681e.4.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.22b138681e.5.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.22b138681e.6.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.2ba1a6008c.0.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.2ba1a6008c.1.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.2ba1a6008c.2.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.2ba1a6008c.3.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.2ba1a6008c.4.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.2ba1a6008c.5.json" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -19,25 +45,45 @@
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/Matrix3x2.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/MatrixTest.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/MatrixTestError.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/MatrixTests.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/MyTransform.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/Tests.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/Transform2DBehaviourUtilityTests.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/EasyFixedTransform2DBehaviour.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/EasyFixedTransform2DBehaviourEditor.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/EasyTransform2DBehaviour.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/EasyTransform2DBehaviourEditor.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/FixedNode3D.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/FixedNode3DMath.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/FixedNode3D_Baseline.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/FixedNode3D_backup.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/FixedNode3D_backupVerified.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/FixedNode3D_bc2.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Lossy.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/NewMonoBehaviourScript.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/TMatrix2x3.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/TSMatrix3x4.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/TestAAA.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/TestSetPos.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Tests/Easy2DTestRunner.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Tests/Easy2DTestsCommon.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Tests/FixedNode3D_NoShearUniformScaleTest.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Tests/FixedNode3D_PerfRandom.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Tests/FixedNode3D_PerfTest.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Tests/RotationOrderTester.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Tests/Test3.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Tests/Transform3DFixedConsistencyTest.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Transform2D.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Transform2DBehaviour.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/Transform2DFixed.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Transform3D.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Scripts/Transform3DSkew.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Tests2/Tests2.asmdef" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/TrueSync/Fix64.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/TrueSync/MathBurstedFix.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/TrueSync/TSMath.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/TrueSync/TSMatrix.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/TrueSync/TSQuaternion.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/TrueSync/TSVector2.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Library/PackageCache/com.unity.mathematics@8017b507cc74/Unity.Mathematics/int2.gen.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
@@ -54,7 +100,7 @@
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;fixed&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;fixed2&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -65,7 +111,7 @@
 }</component>
   <component name="RunManager" selected="附加到 Unity 编辑器.附加到 Unity 编辑器">
     <configuration name="启动 Unity" type="RunUnityExe" factoryName="Unity Executable">
-      <option name="EXE_PATH" value="/Applications/Unity/Hub/Editor/6000.0.57f1/Unity.app/Contents/MacOS/Unity" />
+      <option name="EXE_PATH" value="/Applications/Unity/Hub/Editor/6000.0.58f2/Unity.app/Contents/MacOS/Unity" />
       <option name="PROGRAM_PARAMETERS" value="-projectPath $PROJECT_DIR$ -debugCodeOptimization" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
       <option name="PASS_PARENT_ENVS" value="1" />
@@ -77,7 +123,7 @@
       <method v="2" />
     </configuration>
     <configuration name="单元测试(批处理模式)" type="RunUnityExe" factoryName="Unity Executable">
-      <option name="EXE_PATH" value="/Applications/Unity/Hub/Editor/6000.0.57f1/Unity.app/Contents/MacOS/Unity" />
+      <option name="EXE_PATH" value="/Applications/Unity/Hub/Editor/6000.0.58f2/Unity.app/Contents/MacOS/Unity" />
       <option name="PROGRAM_PARAMETERS" value="-runTests -batchmode -projectPath $PROJECT_DIR$ -testResults Logs/results.xml -logFile Logs/Editor.log -testPlatform EditMode -debugCodeOptimization" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
       <option name="PASS_PARENT_ENVS" value="1" />
@@ -134,6 +180,11 @@
       <workItem from="1759262796908" duration="58000" />
       <workItem from="1759306136150" duration="7614000" />
       <workItem from="1759330108923" duration="1164000" />
+      <workItem from="1759662461546" duration="23597000" />
+      <workItem from="1759695554542" duration="943000" />
+      <workItem from="1759821985129" duration="7215000" />
+      <workItem from="1759829243732" duration="84000" />
+      <workItem from="1759829342291" duration="246000" />
     </task>
     <servers />
   </component>

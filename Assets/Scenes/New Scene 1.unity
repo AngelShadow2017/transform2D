@@ -362,7 +362,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c090ca04a5524f02a531d1387b83c538, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  nodeCount: 180
+  nodeCount: 500
   randomTreeInitial: 1
   initialReparentBias: 0.6
   posMin: {x: -5, y: -3, z: -5}
@@ -396,7 +396,7 @@ MonoBehaviour:
   reparentLocalScaleEps: 0.1
   logFirstMismatch: 1
   logShearDetect: 1
-  stopOnShear: 1
+  stopOnShear: 0
   verbosePerIteration: 0
   summaryAtEnd: 1
   logFirstReparentMismatch: 0
@@ -432,6 +432,93 @@ MonoBehaviour:
   maxEuler: {x: 180, y: 180, z: 180}
   quatDiffEps: 0.00001
   runOnStart: 1
+--- !u!1 &1863184393
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1863184394}
+  - component: {fileID: 1863184395}
+  m_Layer: 0
+  m_Name: GameObject (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &1863184394
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1863184393}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1863184395
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1863184393}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bdf9443eb5b4f4897eb1eec155fa37c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  nodeCount: 5000
+  buildMode: 1
+  randomParentBias: 0.7
+  wideBranching: 32
+  iterations: 120
+  opsPerIteration: 20000
+  weights:
+    setPosition: 0.2
+    setRotationEuler: 0.2
+    setScaleUniform: 0.05
+    setTRS: 0.05
+    queryWorld: 0.3
+    transformPoint: 0.01
+    transformVector: 0.01
+    reparent: 0.1
+    queryWorldMatrixOnly: 0
+  uniformScaleSet:
+  - 0.5
+  - 1
+  - 2
+  - 4
+  randomPickScale: 1
+  fallbackUniformScale: 1
+  allowNonUniformScale: 0
+  posMin: {x: -5, y: -3, z: -5}
+  posMax: {x: 5, y: 3, z: 5}
+  eulerMinDeg: {x: 0, y: 0, z: 0}
+  eulerMaxDeg: {x: 360, y: 360, z: 360}
+  testPointMin: {x: -1, y: -1, z: -1}
+  testPointMax: {x: 1, y: 1, z: 1}
+  enableReparent: 1
+  reparentToNullProbability: 0.1
+  reparentKeepWorldProbability: 0.5
+  enablePerOpSampling: 1
+  perOpSampleRate: 0.185
+  autoRun: 1
+  triggerKey: 114
+  logPerIteration: 0
+  randomSeed: 12345
+  useSeed: 1
+  enableShearSample: 0
+  shearSampleRate: 0.02
+  shearDotEps: 0.0001
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -439,3 +526,4 @@ SceneRoots:
   - {fileID: 677574713}
   - {fileID: 622782919}
   - {fileID: 942405763}
+  - {fileID: 1863184394}
