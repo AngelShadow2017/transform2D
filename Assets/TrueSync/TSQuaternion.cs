@@ -1,4 +1,5 @@
-﻿/* Copyright (C) <2009-2011> <Thorben Linneweber, Jitter Physics>
+﻿#if true
+/* Copyright (C) <2009-2011> <Thorben Linneweber, Jitter Physics>
 * 
 *  This software is provided 'as-is', without any express or implied
 *  warranty.  In no event will the authors be held liable for any damages
@@ -567,3 +568,4 @@ namespace Core.TrueSync
         }
     }
 }
+#endif

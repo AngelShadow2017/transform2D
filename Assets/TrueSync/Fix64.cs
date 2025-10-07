@@ -160,33 +160,33 @@ namespace Core.TrueSync {
         #endregion
         
         #region 机器输出
-        const long PiInv_LONGVAL = 1367130551;
+        public const long PiInv_LONGVAL = 1367130551;
         public static readonly FP PiInv = new FP(PiInv_LONGVAL);
-        const long PiOver2Inv_LONGVAL = 2734261102;
+        public const long PiOver2Inv_LONGVAL = 2734261102;
         public static readonly FP PiOver2Inv = new FP(PiOver2Inv_LONGVAL);
-        const long Deg2Rad_LONGVAL = 74961321;
+        public const long Deg2Rad_LONGVAL = 74961321;
         public static readonly FP Deg2Rad = new FP(Deg2Rad_LONGVAL);
-        const long Rad2Deg_LONGVAL = 246083499217;
+        public const long Rad2Deg_LONGVAL = 246083499217;
         public static readonly FP Rad2Deg = new FP(Rad2Deg_LONGVAL);
-        const long LutInterval_LONGVAL = 562946081331096;
+        public const long LutInterval_LONGVAL = 562946081331096;
         public static readonly FP LutInterval = new FP(LutInterval_LONGVAL);
-        const long EN1_LONGVAL = 429496730;
+        public const long EN1_LONGVAL = 429496730;
         public static readonly FP EN1 = new FP(EN1_LONGVAL);
-        const long EN2_LONGVAL = 42949673;
+        public const long EN2_LONGVAL = 42949673;
         public static readonly FP EN2 = new FP(EN2_LONGVAL);
-        const long EN3_LONGVAL = 4294967;
+        public const long EN3_LONGVAL = 4294967;
         public static readonly FP EN3 = new FP(EN3_LONGVAL);
-        const long EN4_LONGVAL = 429497;
+        public const long EN4_LONGVAL = 429497;
         public static readonly FP EN4 = new FP(EN4_LONGVAL);
-        const long EN5_LONGVAL = 42950;
+        public const long EN5_LONGVAL = 42950;
         public static readonly FP EN5 = new FP(EN5_LONGVAL);
-        const long EN6_LONGVAL = 4295;
+        public const long EN6_LONGVAL = 4295;
         public static readonly FP EN6 = new FP(EN6_LONGVAL);
-        const long EN7_LONGVAL = 429;
+        public const long EN7_LONGVAL = 429;
         public static readonly FP EN7 = new FP(EN7_LONGVAL);
-        const long EN8_LONGVAL = 43;
+        public const long EN8_LONGVAL = 43;
         public static readonly FP EN8 = new FP(EN8_LONGVAL);
-        const long Epsilon_LONGVAL = 4294967;
+        public const long Epsilon_LONGVAL = 4294967;
         public static readonly FP Epsilon = new FP(Epsilon_LONGVAL);
         #endregion
         /// <summary>
