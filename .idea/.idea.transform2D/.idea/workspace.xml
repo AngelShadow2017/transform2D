@@ -5,14 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5d9c2c04-3103-4b1e-88cf-c3682a788642" name="更改" comment="">
+      <change afterPath="$PROJECT_DIR$/Assets/Editor/Tests/FixedNode3DBenchmark.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Editor/Tests/FixedNode3DBenchmark.cs.meta" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Editor/Tests/Transform2DFixedRandomBenchmark.cs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Assets/Editor/Tests/Transform2DFixedRandomBenchmark.cs.meta" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.transform2D/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.transform2D/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/EasyFixedTransform3DBehaviour.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/EasyFixedTransform3DBehaviour.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/New Scene 1.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/New Scene 1.unity" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/FixedNode3DMath.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3DMath.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D_backup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D_backup.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D_backupVerified.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D_backupVerified.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D_bc2.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/FixedNode3D_bc2.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Tests/FixedNode3D_NoShearUniformScaleTest.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Tests/FixedNode3D_NoShearUniformScaleTest.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mono_crash.22b138681e.0.json" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -26,6 +26,9 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/66b6ff42547b49058d130806d84e7dcf469400/ae/5e5adeb8/MulticastDelegate.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/7b6490ba0fcf48e1bbb4ab4356ec67901e0000/f9/34c99bd3/Object.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/FixedNode3DBenchmark.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/Matrix3x2.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/MatrixTest.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/MatrixTestError.cs" root0="FORCE_HIGHLIGHTING" />
@@ -33,6 +36,7 @@
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/MyTransform.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/Tests.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/Transform2DBehaviourUtilityTests.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/Editor/Tests/Transform2DFixedRandomBenchmark.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/EasyFixedTransform2DBehaviour.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/EasyFixedTransform2DBehaviourEditor.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/EasyFixedTransform3DBehaviour.cs" root0="FORCE_HIGHLIGHTING" />
@@ -40,7 +44,6 @@
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/EasyTransform2DBehaviour.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/EasyTransform2DBehaviourEditor.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/FixedNode3D.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="mock:///Volumes/ZeroAs/Projects/transform2D/Assets/Scripts/FixedNode3D.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/FixedNode3DMath.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/FixedNode3D_Baseline.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/Scripts/FixedNode3D_backup.cs" root0="FORCE_HIGHLIGHTING" />
@@ -72,7 +75,7 @@
     <setting file="file://$PROJECT_DIR$/Assets/TrueSync/MathBurstedFix.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/TrueSync/TSMath.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/TrueSync/TSMatrix.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Assets/TrueSync/TSQuaternion.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Assets/TrueSync/TSQuaternion_burst.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Assets/TrueSync/TSVector2.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Library/PackageCache/com.unity.mathematics@8017b507cc74/Unity.Mathematics/int2.gen.cs" root0="SKIP_HIGHLIGHTING" />
   </component>
@@ -84,21 +87,21 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "fixed4",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "vue.rearranger.settings.migration": "true",
-    "附加到 Unity 编辑器.附加到 Unity 编辑器.executor": "Debug"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;fixed4&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;,
+    &quot;附加到 Unity 编辑器.附加到 Unity 编辑器.executor&quot;: &quot;Debug&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected="附加到 Unity 编辑器.附加到 Unity 编辑器">
     <configuration name="启动 Unity" type="RunUnityExe" factoryName="Unity Executable">
       <option name="EXE_PATH" value="/Applications/Unity/Hub/Editor/6000.0.58f2/Unity.app/Contents/MacOS/Unity" />
@@ -124,15 +127,13 @@
       <option name="MIXED_MODE_DEBUG" value="0" />
       <method v="2" />
     </configuration>
-    <configuration name="附加到 Unity 编辑器" type="UNITY_DEBUG_RUN_CONFIGURATION" factoryName="Unity Debug" show_console_on_std_err="false" show_console_on_std_out="false" port="50000" address="localhost" ignored-value-for-modified-check="2439">
+    <configuration name="附加到 Unity 编辑器" type="UNITY_DEBUG_RUN_CONFIGURATION" factoryName="Unity Debug" show_console_on_std_err="false" show_console_on_std_out="false" port="50000" address="localhost">
       <option name="allowRunningInParallel" value="false" />
       <option name="listenPortForConnections" value="false" />
-      <option name="pid" value="2439" />
+      <option name="pid" />
       <option name="projectPathOnTarget" />
       <option name="runtimes">
-        <list>
-          <MonoRuntime />
-        </list>
+        <list />
       </option>
       <option name="selectedOptions">
         <list />
@@ -177,7 +178,8 @@
       <workItem from="1759821985129" duration="7215000" />
       <workItem from="1759829243732" duration="84000" />
       <workItem from="1759829342291" duration="246000" />
-      <workItem from="1759829621876" duration="8862000" />
+      <workItem from="1759829621876" duration="23900000" />
+      <workItem from="1759898022918" duration="1976000" />
     </task>
     <servers />
   </component>
@@ -209,19 +211,6 @@
           <properties exception="System.Threading.ThreadAbortException" breakIfHandledByOtherCode="false" displayValue="System.Threading.ThreadAbortException" />
           <option name="timeStamp" value="3" />
         </breakpoint>
-        <line-breakpoint enabled="true" type="DotNet Breakpoints">
-          <url>file://$PROJECT_DIR$/Assets/Scripts/EasyFixedTransform3DBehaviour.cs</url>
-          <line>236</line>
-          <properties documentPath="$PROJECT_DIR$/Assets/Scripts/EasyFixedTransform3DBehaviour.cs" containingFunctionPresentation="方法 'OnTransformParentChanged'">
-            <startOffsets>
-              <option value="7310" />
-            </startOffsets>
-            <endOffsets>
-              <option value="7370" />
-            </endOffsets>
-          </properties>
-          <option name="timeStamp" value="4" />
-        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>

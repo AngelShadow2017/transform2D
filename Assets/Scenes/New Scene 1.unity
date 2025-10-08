@@ -930,14 +930,14 @@ MonoBehaviour:
   nodeCount: 5000
   buildMode: 2
   randomParentBias: 0.7
-  wideBranching: 32
+  wideBranching: 5000
   iterations: 120
   opsPerIteration: 20000
   weights:
-    setPosition: 0.2
-    setRotationEuler: 0.2
-    setScaleUniform: 0.05
-    setTRS: 0.05
+    setPosition: 0.3
+    setRotationEuler: 0.3
+    setScaleUniform: 0.2
+    setTRS: 0.2
     queryWorld: 0.3
     transformPoint: 0.01
     transformVector: 0.01
@@ -957,7 +957,7 @@ MonoBehaviour:
   eulerMaxDeg: {x: 360, y: 360, z: 360}
   testPointMin: {x: -1, y: -1, z: -1}
   testPointMax: {x: 1, y: 1, z: 1}
-  enableReparent: 1
+  enableReparent: 0
   reparentToNullProbability: 0.1
   reparentKeepWorldProbability: 0.5
   enablePerOpSampling: 1

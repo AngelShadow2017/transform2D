@@ -32,7 +32,7 @@ public class FixedNode3D
 
     #region Hierarchy
     private FixedNode3D _parent;
-    private readonly List<FixedNode3D> _children = new List<FixedNode3D>(4);
+    private readonly HashSet<FixedNode3D> _children = new HashSet<FixedNode3D>(4);
     #endregion
 
     #region Local Representations
@@ -228,7 +228,7 @@ public class FixedNode3D
         if (newParent != null && WouldIntroduceCycle(newParent)) { _cyclePrevented++; return; }
         UpdateGlobalTransformIfNeeded();
         var oldWorld = _globalTransform;
-        if (_parent != null) _parent._children.Remove(this);
+        if (_parent != null){ _parent._children.Remove(this);}
         _parent = newParent;
         if (_parent != null) _parent._children.Add(this);
         if (!_isTopLevel && keepWorld)
